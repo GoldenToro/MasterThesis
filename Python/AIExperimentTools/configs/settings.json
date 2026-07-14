@@ -1,5 +1,5 @@
 {
-  "framework_version": "0.1.0",
+  "framework_version": "0.2.0",
   "paths": {
     "results_root": "results",
     "experiments_root": "experiments",
@@ -15,12 +15,7 @@
   },
   "execution": {
     "continue_on_experiment_error": false,
-    "overwrite_existing_map_files": false,
-    "max_parallel_map_evaluations": 8,
+    "max_parallel_map_evaluations": 16,
     "max_parallel_simulations_per_map": 1
-  },
-  "reporting": {
-    "create_plots": true,
-    "copy_best_map": true
   }
 }

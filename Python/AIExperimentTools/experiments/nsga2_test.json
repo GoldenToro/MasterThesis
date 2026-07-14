@@ -1,18 +1,17 @@
 {
   "experiment_name": "nsga2_test",
   "generator": "nsga2",
+  "seed": -1,
+  "only_keep_result_summary": false,
   "generator_settings": {
-    "num_epochs": 100,
+    "num_epochs": 5,
     "population_size": 40,
     "mate_probability": 0.3,
     "mutate_probability": 0.3,
     "map_width": 64,
     "map_height": 64,
+    "map_scale": 2,
     "repair_enabled": true,
-    "objectives": [
-      "entropy",
-      "pace"
-    ],
     "validation": {
       "minimum_spawn_count": 2,
       "minimum_walkable_ratio": 0.08,

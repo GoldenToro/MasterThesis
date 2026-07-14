@@ -1,0 +1,9 @@
+{
+  "mate_probability": 0.3,
+  "mutate_probability": 0.3,
+  "objectives": [
+    "entropy",
+    "pace"
+  ],
+  "checkpoint_every_epoch": true
+}

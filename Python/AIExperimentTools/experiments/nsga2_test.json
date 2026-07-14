@@ -1,0 +1,60 @@
+{
+  "experiment_name": "nsga2_test",
+  "generator": "nsga2",
+  "generator_settings": {
+    "num_epochs": 100,
+    "population_size": 40,
+    "mate_probability": 0.3,
+    "mutate_probability": 0.3,
+    "map_width": 64,
+    "map_height": 64,
+    "repair_enabled": true,
+    "objectives": [
+      "entropy",
+      "pace"
+    ],
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 0.75,
+      "require_single_connected_region": true
+    },
+    "checkpoint_every_epoch": true,
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "weight": 0.75,
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        {
+          "name": "pace",
+          "weight": 0.25,
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      ]
+    }
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 1,
+    "matches_per_simulation": 1,
+    "log_positions": true,
+    "log_death_positions": true,
+    "log_kill_distances": true,
+    "save_unity_map": true,
+    "game_length": 120,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "sniper",
+      "skill": 0.6
+    }
+  }
+}

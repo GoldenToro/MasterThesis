@@ -4,6 +4,7 @@ import copy
 import json
 import pickle
 import random
+from time import perf_counter
 from hashlib import sha1
 from typing import Any
 
@@ -79,45 +80,107 @@ def run(base_generator: BaseGenerator) -> list[str]:
         epoch: int,
         numeric_id: int,
     ) -> CanonicalMap:
+        started = perf_counter()
         phenotype = individual.phenotype()
-        return CanonicalMap.from_area_rectangles(
+        areas = [area.__dict__ for area in phenotype.areas]
+        canonical_map = CanonicalMap.from_area_rectangles(
             map_id=f"nsga2_e{epoch:04d}_i{numeric_id:04d}",
             width=phenotype.mapWidth,
             height=phenotype.mapHeight,
-            areas=[area.__dict__ for area in phenotype.areas],
+            areas=areas,
             metadata={
                 "generator": "nsga2",
                 "epoch": epoch,
                 "id": numeric_id,
                 "map_scale": phenotype.mapScale,
+                "genome_representation_type": "all_black",
+                "room_count": sum(
+                    bool(area.get("isCorridor", False)) is False
+                    for area in areas
+                ),
+                "corridor_count": sum(
+                    bool(area.get("isCorridor", False))
+                    for area in areas
+                ),
+                "generation_time_seconds": perf_counter() - started,
             },
         )
+        return canonical_map
 
-    def evaluate_batch(individuals: list[Any], epoch: int) -> None:
+    def evaluate_batch(
+            individuals: list[Any],
+            epoch: int,
+            numeric_id_start: int = 0,
+    ) -> None:
         if len(individuals) == 0:
             return
+
         maps = [
-            create_canonical_map(individual, epoch, numeric_id)
-            for numeric_id, individual in enumerate(individuals)
+            create_canonical_map(
+                individual,
+                epoch,
+                numeric_id_start + offset,
+            )
+            for offset, individual in enumerate(individuals)
         ]
+
         epoch_dir = base_generator.save_epoch_maps(epoch, maps)
         table = base_generator.evaluate_epoch(epoch_dir)
+
+        current_map_ids = {canonical_map.map_id for canonical_map in maps}
+        table = table[
+            np.isin(
+                table["map_id"],
+                list(current_map_ids),
+            )
+        ]
+
         if len(table) != len(individuals):
             raise RuntimeError(
-                f"Expected {len(individuals)} evaluation rows, received {len(table)}"
+                f"Expected {len(individuals)} evaluation rows, "
+                f"received {len(table)}"
             )
 
         table = table[np.argsort(table["id"])]
+
         for individual, row in zip(individuals, table):
             individual.fitness.values = tuple(
                 float(row[name]) for name in objective_names
             )
             individual.result_map_id = str(row["map_id"])
 
+
     import numpy as np
 
-    population = [toolbox.individual() for _ in range(population_size)]
-    evaluate_batch(population, 0)
+    # keep generating and evaluating candidates until the population contains
+    # exactly population_size individuals whose first objective is nonzero.
+    population: list[Any] = []
+    next_initial_numeric_id = 0
+    while len(population) < population_size:
+        remaining = population_size - len(population)
+        print(f"Initial population: {remaining} valid individuals still required")
+
+        candidates = [toolbox.individual() for _ in range(remaining)]
+        evaluate_batch(
+            candidates,
+            epoch=0,
+            numeric_id_start=next_initial_numeric_id,
+        )
+        next_initial_numeric_id += len(candidates)
+
+        for candidate in candidates:
+            first_objective = float(candidate.fitness.values[0])
+            if first_objective != 0.0:
+                population.append(candidate)
+            else:
+                print(
+                    "Drop initial individual "
+                    f"'{candidate.result_map_id}' because "
+                    f"{objective_names[0]} equals 0"
+                )
+
+    # Assign Pareto rank and crowding distance. This performs no survivor
+    # reduction because the requested size equals the population size.
     population = toolbox.select(population, len(population))
     _save_checkpoint(base_generator, 0, population)
 
@@ -165,14 +228,29 @@ def _save_checkpoint(
 ) -> None:
     epoch_dir = base_generator.output_dir / f"epoch_{epoch:04d}"
     epoch_dir.mkdir(parents=True, exist_ok=True)
+    selected_map_ids = [
+        str(getattr(individual, "result_map_id", ""))
+        for individual in population
+    ]
     payload = {
         "epoch": epoch,
         "population": population,
         "random_state": random.getstate(),
-        "selected_map_ids": [
-            str(getattr(individual, "result_map_id", ""))
-            for individual in population
-        ],
+        "selected_map_ids": selected_map_ids,
     }
     with (epoch_dir / "checkpoint.pkl").open("wb") as handle:
         pickle.dump(payload, handle)
+
+    # Lightweight summary for post-experiment analysis. This avoids unpickling
+    # DEAP individuals and preserves duplicate map IDs in the selected population.
+    (epoch_dir / "checkpoint_summary.json").write_text(
+        json.dumps(
+            {
+                "epoch": epoch,
+                "population_size": len(population),
+                "selected_map_ids": selected_map_ids,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )

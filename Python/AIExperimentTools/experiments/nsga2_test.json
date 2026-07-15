@@ -1,10 +1,9 @@
 {
   "experiment_name": "nsga2_test",
   "generator": "nsga2",
-  "seed": -1,
-  "only_keep_result_summary": false,
   "generator_settings": {
-    "num_epochs": 5,
+    "seed": -1,
+    "num_epochs": 2,
     "population_size": 40,
     "mate_probability": 0.3,
     "mutate_probability": 0.3,
@@ -12,10 +11,11 @@
     "map_height": 64,
     "map_scale": 2,
     "repair_enabled": true,
+    "copy_final_candidate_maps": true,
     "validation": {
       "minimum_spawn_count": 2,
       "minimum_walkable_ratio": 0.08,
-      "maximum_walkable_ratio": 0.75,
+      "maximum_walkable_ratio": 1,
       "require_single_connected_region": true
     },
     "checkpoint_every_epoch": true,
@@ -23,14 +23,12 @@
       "metrics": [
         {
           "name": "entropy",
-          "weight": 0.75,
           "goal": "maximize",
           "minimum": 0.0,
           "maximum": 1.0
         },
         {
           "name": "pace",
-          "weight": 0.25,
           "goal": "maximize",
           "minimum": 0.0,
           "maximum": 1.0
@@ -52,8 +50,21 @@
       "skill": 0.4
     },
     "bot2": {
-      "file": "sniper",
-      "skill": 0.6
+      "file": "assault",
+      "skill": 0.4
     }
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [],
+    "create_diagram_fitness": true,
+    "create_diagram_for_metric": [
+      "pace",
+      "entropy",
+      "repair_count",
+      "walkable_area_ratio"
+    ]
   }
 }

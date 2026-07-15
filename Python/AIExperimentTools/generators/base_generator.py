@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib
 import json
 import logging
 import shutil
@@ -15,7 +16,7 @@ from map_schema.canonical_map import CanonicalMap
 from map_schema.map_exporter import load_canonical_map, save_canonical_map
 from map_schema.map_repairer import MapRepairer
 from map_schema.map_validator import MapValidator
-from metrics.metric_calculator import calculate_metrics
+from metrics.metric_calculator import MetricContext, calculate_metrics, normalize_metric_name
 from generators.registry import load_generator
 from simulation.unity_runner import UnityRunner
 
@@ -59,7 +60,10 @@ class BaseGenerator:
 
     @property
     def objective_names(self) -> list[str]:
-        return [str(specification["name"]) for specification in self.metric_specs]
+        return [
+            normalize_metric_name(str(specification["name"]))
+            for specification in self.metric_specs
+        ]
 
     def start(self) -> list[str]:
         """Load the selected generator through the generator registry."""
@@ -147,10 +151,52 @@ class BaseGenerator:
             payload["final_candidate"] = str(payload.get("map_id")) in selected
             result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
+    def copy_final_candidate_maps(self, map_ids: Iterable[str]) -> list[Path]:
+        """Copy final-candidate Unity input JSON files into the run export folder.
+
+        The behavior is controlled by
+        ``generator_settings.copy_final_candidate_maps``. Missing Unity inputs are
+        reported and skipped, which allows dry runs and invalid maps to complete.
+        """
+        if bool(self.generator_settings.get("copy_final_candidate_maps", False)) is False:
+            return []
+
+        selected = sorted({str(value) for value in map_ids})
+        export_dir = self.output_dir / "export"
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        copied: list[Path] = []
+        for map_id in selected:
+            matches = sorted(
+                self.output_dir.glob(f"epoch_*/{map_id}.unity.json")
+            )
+            if len(matches) == 0:
+                LOGGER.warning(
+                    "Final candidate '%s' has no Unity JSON to copy.",
+                    map_id,
+                )
+                continue
+
+            source = matches[-1]
+            destination = export_dir / source.name
+            shutil.copy2(source, destination)
+            copied.append(destination)
+
+        LOGGER.info(
+            "Copied %s/%s final-candidate Unity JSON files to %s.",
+            len(copied),
+            len(selected),
+            export_dir,
+        )
+        return copied
+
     def cleanup_outputs(self) -> None:
-        """Keep failed Unity runs, or remove all raw data in summary-only mode."""
+        """Remove intermediate maps and apply the configured raw-data policy."""
+        for map_path in self.output_dir.glob("epoch_*/*.map.json"):
+            map_path.unlink(missing_ok=True)
+
         raw_dir = self.output_dir / "_raw"
-        if bool(self.experiment.get("only_keep_result_summary", False)):
+        if bool(self.experiment.get("analysis_settings", {}).get("only_keep_result_summary", False)):
             shutil.rmtree(raw_dir, ignore_errors=True)
             return
         self._remove_empty_directories(raw_dir)
@@ -210,6 +256,7 @@ class BaseGenerator:
             ).run(
                 canonical_map=canonical_map,
                 run_dir=self.output_dir,
+                epoch_dir=epoch_dir,
                 simulator_settings=self.simulator_settings,
                 epoch=epoch,
                 numeric_id=numeric_id,
@@ -226,7 +273,27 @@ class BaseGenerator:
             else:
                 status = "failed"
 
-        calculated = calculate_metrics(match_records, self.objective_names)
+        metric_context = MetricContext(
+            canonical_map=canonical_map,
+            match_records=match_records,
+            record={
+                "repair": repair_report,
+                "validation_before_repair": validation_before.to_dict(),
+                "validation": validation.to_dict(),
+            },
+            raw_map_dir=(
+                self.output_dir
+                / "_raw"
+                / f"epoch_{epoch:04d}"
+                / canonical_map.map_id
+            ),
+            experiment=self.experiment,
+        )
+        calculated = calculate_metrics(
+            match_records,
+            self.objective_names,
+            metric_context,
+        )
         metrics = self._apply_missing_metric_penalties(
             calculated,
             force_penalty=(validation.valid is False or status == "failed"),
@@ -255,6 +322,7 @@ class BaseGenerator:
         }
         result_path = epoch_dir / f"{canonical_map.map_id}.result.json"
         result_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
         return record
 
     def _apply_missing_metric_penalties(
@@ -264,7 +332,7 @@ class BaseGenerator:
     ) -> dict[str, float]:
         result: dict[str, float] = {}
         for specification in self.metric_specs:
-            name = str(specification["name"])
+            name = normalize_metric_name(str(specification["name"]))
             value = values.get(name)
             if force_penalty or value is None:
                 goal = str(specification.get("goal", "maximize"))
@@ -283,7 +351,7 @@ class BaseGenerator:
         weighted_sum = 0.0
         total_weight = 0.0
         for specification in self.metric_specs:
-            name = str(specification["name"])
+            name = normalize_metric_name(str(specification["name"]))
             minimum = float(specification.get("minimum", 0.0))
             maximum = float(specification.get("maximum", 1.0))
             if maximum <= minimum:

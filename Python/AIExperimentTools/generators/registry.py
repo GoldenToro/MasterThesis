@@ -12,6 +12,10 @@ GeneratorRunner = Callable[["BaseGenerator"], list[str]]
 
 
 _GENERATORS: dict[str, tuple[str, str]] = {
+    "manual": (
+        "generators.manual.manual_generator",
+        "run",
+    ),
     "nsga2": (
         "generators.nsga2.nsga2_generator",
         "run",

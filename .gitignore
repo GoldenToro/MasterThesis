@@ -68,5 +68,5 @@ Unity/Project Arena/Assets/SO Architecture.meta
 
 .idea
 /.idea/
-/.Python/AIExperimentTools/results/nsga2_test/
-Python/AIExperimentTools/results/nsga2_test/
+/.Python/AIExperimentTools/results/*
+Python/AIExperimentTools/results/*

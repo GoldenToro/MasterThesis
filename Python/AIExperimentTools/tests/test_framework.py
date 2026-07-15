@@ -11,10 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from analysis.experiment_analyzer import ExperimentAnalyzer
 from experiment_manager import ExperimentManager
 from generators.base_generator import BaseGenerator
 from map_schema.canonical_map import CanonicalMap
-from metrics.metric_calculator import calculate_metrics
+from metrics.metric_calculator import MetricContext, calculate_metrics
 
 
 class FrameworkTest(unittest.TestCase):
@@ -34,6 +35,82 @@ class FrameworkTest(unittest.TestCase):
         )
         self.assertAlmostEqual(metrics["entropy"], 0.4)
         self.assertAlmostEqual(metrics["pace"], 0.6)
+
+
+    def test_static_analysis_enriches_results_csv(self):
+        grid = (
+            "######",
+            "#S...#",
+            "#....#",
+            "#....#",
+            "#...S#",
+            "######",
+        )
+        canonical_map = CanonicalMap("map_0", 6, 6, grid)
+        experiment = {
+            "experiment_name": "analysis_test",
+            "generator": "fake",
+            "generator_settings": {
+                "fitness": {
+                    "metrics": [
+                        {"name": "entropy", "goal": "maximize"}
+                    ]
+                }
+            },
+            "analysis_settings": {
+                "enabled": True,
+                "calculate_all_metrics": False,
+                "calculate_metric": [
+                    "walkable_area_ratio",
+                    "connectivity",
+                    "spawn_count",
+                ],
+                "create_diagram_fitness": False,
+                "create_diagram_for_metric": [],
+            },
+        }
+        record = {
+            "experiment": "analysis_test",
+            "generator": "fake",
+            "epoch": 0,
+            "id": 0,
+            "map_id": "map_0",
+            "valid": True,
+            "status": "simulation_disabled",
+            "simulations_requested": 0,
+            "simulations_successful": 0,
+            "simulations_failed": 0,
+            "match_count": 0,
+            "metrics": {"entropy": 0.0},
+            "fitness_value": 0.0,
+            "final_candidate": True,
+            "repair": {"actions": []},
+            "validation_before_repair": {"errors": []},
+        }
+
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp)
+            epoch_dir = run_dir / "epoch_0000"
+            epoch_dir.mkdir()
+            (epoch_dir / "map_0.map.json").write_text(
+                json.dumps(canonical_map.to_dict()),
+                encoding="utf-8",
+            )
+            (epoch_dir / "map_0.result.json").write_text(
+                json.dumps(record),
+                encoding="utf-8",
+            )
+            (run_dir / "results.csv").write_text("", encoding="utf-8")
+
+            summary = ExperimentAnalyzer(run_dir, experiment).run()
+            self.assertEqual(summary["record_count"], 1)
+            payload = json.loads(
+                (epoch_dir / "map_0.result.json").read_text(encoding="utf-8")
+            )
+            self.assertAlmostEqual(payload["metrics"]["walkable_area_ratio"], 16 / 36)
+            self.assertEqual(payload["metrics"]["connectivity"], 1.0)
+            self.assertEqual(payload["metrics"]["spawn_count"], 2)
+            self.assertTrue((run_dir / "export" / "analysis_summary.json").is_file())
 
     def test_epoch_results_are_sorted_and_numpy_friendly(self):
         experiment = {

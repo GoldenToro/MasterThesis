@@ -3,3 +3,4 @@ pandas>=2.0
 matplotlib>=3.7
 deap>=1.4
 jsonpickle>=3.0
+networkx>=3.2

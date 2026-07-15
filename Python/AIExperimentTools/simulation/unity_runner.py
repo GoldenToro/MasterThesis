@@ -43,7 +43,7 @@ class _SingleUnityRunResult:
 
 
 class UnityRunner:
-    """Run Unity simulations and retain only failed runtime folders."""
+    """Run Unity simulations and keep runtime folders until final cleanup."""
 
     def __init__(self, framework_root: Path, technical_settings: dict[str, Any]):
         self.framework_root = framework_root
@@ -53,6 +53,7 @@ class UnityRunner:
         self,
         canonical_map: CanonicalMap,
         run_dir: Path,
+        epoch_dir: Path,
         simulator_settings: dict[str, Any],
         epoch: int,
         numeric_id: int,
@@ -83,6 +84,7 @@ class UnityRunner:
             return self._run_single_simulation(
                 canonical_map=canonical_map,
                 run_dir=run_dir,
+                epoch_dir=epoch_dir,
                 simulator_settings=simulator_settings,
                 epoch=epoch,
                 numeric_id=numeric_id,
@@ -126,6 +128,7 @@ class UnityRunner:
         self,
         canonical_map: CanonicalMap,
         run_dir: Path,
+        epoch_dir: Path,
         simulator_settings: dict[str, Any],
         epoch: int,
         numeric_id: int,
@@ -213,8 +216,18 @@ class UnityRunner:
                 },
             }
             config_file = runtime_root / "map_test_config.json"
-            config_file.write_text(
-                json.dumps(config_payload, indent=2),
+            serialized_config = json.dumps(config_payload, indent=2)
+            config_file.write_text(serialized_config, encoding="utf-8")
+
+            # Keep one exact Unity input JSON per map in the epoch folder.
+            # Additional simulation configs remain available below _raw when
+            # only_keep_result_summary is false.
+            if simulation_index == 0:
+                unity_input_path = (
+                    epoch_dir / f"{canonical_map.map_id}.unity.json"
+                )
+                unity_input_path.write_text(
+                    serialized_config,
                 encoding="utf-8",
             )
 
@@ -262,8 +275,6 @@ class UnityRunner:
                 record["simulation_index"] = simulation_index
                 record["match_index"] = match_index
 
-            shutil.rmtree(runtime_root)
-            self._prune_empty_parents(runtime_root.parent, run_dir / "_raw")
             return _SingleUnityRunResult(
                 successful=True,
                 match_records=match_records,

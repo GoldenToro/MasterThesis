@@ -15,6 +15,7 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from analysis.experiment_analyzer import ExperimentAnalyzer
 from generators.base_generator import BaseGenerator
 
 
@@ -38,7 +39,7 @@ class ExperimentManager:
     def run_config(self, config_path: Path, dry_run: bool = False) -> Path:
         source_experiment = self._load_json(config_path)
         experiment = copy.deepcopy(source_experiment)
-        experiment["seed"] = self._resolve_seed(experiment.get("seed"))
+        experiment["seed"] = self._resolve_seed(experiment.get("generator_settings", {}).get("seed"))
         if dry_run:
             experiment.setdefault("simulator_settings", {})["enabled"] = False
 
@@ -85,6 +86,10 @@ class ExperimentManager:
         try:
             final_map_ids = base_generator.start()
             base_generator.mark_final_candidates(final_map_ids)
+            copied_final_candidate_maps = base_generator.copy_final_candidate_maps(
+                final_map_ids
+            )
+            analysis_summary = ExperimentAnalyzer(run_dir, experiment).run()
             base_generator.cleanup_outputs()
 
             finished_at = datetime.now().astimezone()
@@ -98,6 +103,11 @@ class ExperimentManager:
                     "status": "completed",
                     "successful": True,
                     "final_candidate_map_ids": list(final_map_ids),
+                    "copied_final_candidate_maps": [
+                        str(path.relative_to(run_dir))
+                        for path in copied_final_candidate_maps
+                    ],
+                    "analysis": analysis_summary,
                 }
             )
             self._write_evaluated_experiment(run_dir, experiment, metadata)
@@ -165,25 +175,6 @@ class ExperimentManager:
             raise ValueError(f"Experiment {path} is missing fields: {missing}")
 
         generator = experiment["generator_settings"]
-        generator_required = {
-            "num_epochs",
-            "population_size",
-            "map_width",
-            "map_height",
-            "fitness",
-        }
-        missing_generator = sorted(generator_required - generator.keys())
-        if missing_generator:
-            raise ValueError(
-                f"Experiment {path} generator_settings is missing fields: "
-                f"{missing_generator}"
-            )
-        if int(generator["population_size"]) <= 0:
-            raise ValueError("population_size must be positive")
-        if int(generator["num_epochs"]) < 0:
-            raise ValueError("num_epochs must be zero or positive")
-        if int(generator["map_width"]) <= 0 or int(generator["map_height"]) <= 0:
-            raise ValueError("map dimensions must be positive")
 
         metric_specs = generator.get("fitness", {}).get("metrics", [])
         if len(metric_specs) == 0:
@@ -193,6 +184,30 @@ class ExperimentManager:
             raise ValueError("Every fitness metric requires a name")
         if len(set(metric_names)) != len(metric_names):
             raise ValueError("Fitness metric names must be unique")
+
+        from metrics.metric_calculator import (
+            MAP_NUMERIC_METRIC_NAMES,
+            available_metric_names,
+            normalize_metric_name,
+        )
+
+        normalized_fitness_names = [normalize_metric_name(name) for name in metric_names]
+        unknown_fitness = sorted(
+            set(normalized_fitness_names) - set(available_metric_names())
+        )
+        if unknown_fitness:
+            raise ValueError(
+                "Unknown fitness metrics: " + ", ".join(unknown_fitness)
+            )
+        invalid_fitness_scope = sorted(
+            set(normalized_fitness_names) - set(MAP_NUMERIC_METRIC_NAMES)
+        )
+        if invalid_fitness_scope:
+            raise ValueError(
+                "Fitness metrics must be scalar values calculated for one map. "
+                "Population metrics belong in results_by_epoch.csv: "
+                + ", ".join(invalid_fitness_scope)
+            )
 
         simulator = experiment["simulator_settings"]
         if bool(simulator.get("enabled", True)):
@@ -218,6 +233,26 @@ class ExperimentManager:
             for bot_name in ("bot1", "bot2"):
                 if {"file", "skill"}.issubset(simulator[bot_name]) is False:
                     raise ValueError(f"{bot_name} requires file and skill")
+
+        analysis = experiment.get("analysis_settings", {})
+        if bool(analysis.get("enabled", False)):
+            for list_name in ("calculate_metric", "create_diagram_for_metric"):
+                value = analysis.get(list_name, [])
+                if isinstance(value, list) is False:
+                    raise ValueError(f"analysis_settings.{list_name} must be a list")
+            requested = [
+                normalize_metric_name(value)
+                for value in analysis.get("calculate_metric", [])
+            ]
+            requested.extend(
+                normalize_metric_name(value)
+                for value in analysis.get("create_diagram_for_metric", [])
+            )
+            unknown = sorted(set(requested) - set(available_metric_names()))
+            if unknown:
+                raise ValueError(
+                    "Unknown analysis metrics: " + ", ".join(unknown)
+                )
 
     @staticmethod
     def _resolve_seed(value: Any) -> int:

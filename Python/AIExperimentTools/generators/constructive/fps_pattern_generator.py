@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import random
+from random import Random
+
+from generators.base_generator import BaseGenerator
+from generators.constructive.common import (
+    Rect,
+    blank_grid,
+    carve_corridor,
+    carve_rect,
+    grid_rows,
+    place_symmetric_cover,
+    run_constructive,
+)
+from map_schema.canonical_map import CanonicalMap
+
+# Not happy with this algo , have to bring in randomizing
+
+def run(base_generator: BaseGenerator) -> list[str]:
+    return run_constructive(base_generator, _generate, "fps_pattern")
+
+
+def _generate(
+    width: int,
+    height: int,
+    rng: random.Random,
+    settings: dict,
+    map_id: str,
+) -> CanonicalMap:
+    if width < 24 or height < 18:
+        raise ValueError("FPS pattern generator requires map dimensions of at least 24x18")
+
+    corridor_width = max(1, int(settings.get("corridor_width", 2)))
+    route_count = random.randrange(1, 10)
+    place_cover = bool(settings.get("place_cover", False))
+
+    side_width = max(5, width // 8)
+    side_height = max(6, height // 3)
+    arena_width = max(7, width // 4)
+    arena_height = max(7, height // 3)
+    support_width = max(5, width // 7)
+    support_height = max(4, height // 5)
+
+    center_y = height // 2
+    left_room = Rect(2, center_y - side_height // 2, side_width, side_height)
+    right_room = Rect(width - 2 - side_width, center_y - side_height // 2, side_width, side_height)
+    arena = Rect(width // 2 - arena_width // 2, center_y - arena_height // 2, arena_width, arena_height)
+    top_room = Rect(width // 2 - support_width // 2, 2, support_width, support_height)
+    bottom_room = Rect(
+        width // 2 - support_width // 2,
+        height - 2 - support_height,
+        support_width,
+        support_height,
+    )
+
+    rooms = [left_room, right_room, arena, top_room, bottom_room]
+    grid = blank_grid(width, height)
+    for room in rooms:
+        carve_rect(grid, room)
+
+    connections: list[tuple[tuple[int, int], tuple[int, int]]] = []
+
+    def connect(first: tuple[int, int], second: tuple[int, int], horizontal_first: bool) -> None:
+        carve_corridor(
+            grid,
+            first,
+            second,
+            corridor_width,
+            horizontal_first=horizontal_first,
+        )
+        connections.append((first, second))
+
+    # A three-route layout adds the direct central lane. A two-route layout
+    # keeps only the symmetric upper and lower flanks.
+    if route_count == 3:
+        connect(left_room.center, arena.center, True)
+        connect(arena.center, right_room.center, True)
+
+    # Upper and lower flank routes create loops around the central arena.
+    top_lane_y = top_room.center[1]
+    bottom_lane_y = bottom_room.center[1]
+    connect(left_room.center, (left_room.center[0], top_lane_y), False)
+    connect((left_room.center[0], top_lane_y), top_room.center, True)
+    connect(top_room.center, (right_room.center[0], top_lane_y), True)
+    connect((right_room.center[0], top_lane_y), right_room.center, False)
+
+    connect(left_room.center, (left_room.center[0], bottom_lane_y), False)
+    connect((left_room.center[0], bottom_lane_y), bottom_room.center, True)
+    connect(bottom_room.center, (right_room.center[0], bottom_lane_y), True)
+    connect((right_room.center[0], bottom_lane_y), right_room.center, False)
+
+    # Keep the central arena reachable from both flanks. With three routes,
+    # the direct middle lane adds a separate team-to-team path through it.
+    connect(top_room.center, (arena.center[0], arena.y), False)
+    connect(bottom_room.center, (arena.center[0], arena.bottom - 1), False)
+
+    cover_count = 0
+    if place_cover:
+        cover_points = [
+            (arena.x + arena.width // 3, arena.y + arena.height // 3),
+            (arena.x + arena.width // 3, arena.bottom - arena.height // 3 - 1),
+            (left_room.x + left_room.width // 2, left_room.y + 1),
+        ]
+        cover_count = place_symmetric_cover(grid, cover_points)
+
+    return CanonicalMap(
+        map_id=map_id,
+        width=width,
+        height=height,
+        grid=grid_rows(grid),
+        metadata={
+            "genome_representation_type": "fps_pattern_rules",
+            "room_count": len(rooms),
+            "corridor_count": len(connections),
+            "cover_object_count_generated": cover_count,
+            "fps_pattern": "symmetric_multi_route",
+            "route_count": route_count,
+        },
+    )

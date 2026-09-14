@@ -41,10 +41,11 @@ namespace Managers.Mode
         // Setups stuff for the loggingGame.
         public void SetupLogging()
         {
+            var currentMap = mapManagerScript.GetMap();
             MapInfoGameEvent.Instance.Raise(new MapInfo
             {
-                height = mapManagerScript.GetMapGenerator().GetHeight(),
-                width = mapManagerScript.GetMapGenerator().GetWidth(),
+                height = currentMap.GetLength(0),
+                width = currentMap.GetLength(1),
                 ts = mapManagerScript.GetMapAssembler().GetMapScale(),
                 f = mapManagerScript.GetFlip()
             });

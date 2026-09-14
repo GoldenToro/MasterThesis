@@ -1,0 +1,64 @@
+{
+  "experiment_name": "random_digger",
+  "generator": "random_digger",
+  "generator_settings": {
+      "only_keep_result_summary": false,
+    "population_size": 40,
+    "map_width": 64,
+    "map_height": 64,
+    "repair_enabled": true,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "walkable_area_ratio",
+          "goal": "maximize"
+        }
+      ]
+    },
+    "target_walkable_ratio": 0.35,
+    "forward_probability": 0.55,
+    "left_probability": 0.15,
+    "right_probability": 0.15,
+    "revisit_probability": 0.15,
+    "room_chance": 0.03,
+    "room_min_size": 3,
+    "room_max_size": 7
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 1,
+    "matches_per_simulation": 1,
+    "log_positions": true,
+    "log_death_positions": true,
+    "log_kill_distances": true,
+    "save_unity_map": false,
+    "game_length": 120,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "sniper",
+      "skill": 0.6
+    }
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "calculate_all_metrics": false,
+    "calculate_metric": [],
+    "create_diagram_fitness": true,
+    "create_diagram_for_metric": [
+      "pace",
+      "entropy",
+      "repair_count",
+      "walkable_area_ratio"
+    ]
+  }
+}

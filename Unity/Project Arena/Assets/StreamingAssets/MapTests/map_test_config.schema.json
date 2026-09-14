@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arena.local/schemas/map-test-config-1.0.json",
+  "title": "Project Arena Map Test Configuration",
+  "type": "object",
+  "required": [
+    "experiment_name",
+    "num_experiments",
+    "game_length",
+    "map",
+    "bot1",
+    "bot2"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "experiment_name": { "type": "string", "minLength": 1 },
+    "num_experiments": { "type": "integer", "minimum": 1 },
+    "game_length": { "type": "integer", "minimum": 1 },
+    "ready_duration": { "type": "integer", "minimum": 0 },
+    "score_duration": { "type": "integer", "minimum": 0 },
+    "respawn_duration": { "type": "number", "minimum": 0 },
+    "paths": {
+      "type": "object",
+      "properties": {
+        "bots_directory": { "type": "string" },
+        "output_directory": { "type": "string" },
+        "output_subdirectory": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "save_map": { "type": "boolean" },
+        "log_positions": { "type": "boolean" },
+        "log_kill_distances": { "type": "boolean" },
+        "log_death_positions": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "map": {
+      "type": "object",
+      "required": ["map_id", "width", "height", "map_scale", "grid"],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "map_id": { "type": "string", "minLength": 1 },
+        "width": { "type": "integer", "minimum": 2 },
+        "height": { "type": "integer", "minimum": 2 },
+        "map_scale": { "type": "number", "exclusiveMinimum": 0 },
+        "grid": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 2 }
+        },
+        "symbols": {
+          "type": "object",
+          "properties": {
+            "wall": { "$ref": "#/$defs/symbol" },
+            "floor": { "$ref": "#/$defs/symbol" },
+            "spawn": { "$ref": "#/$defs/symbol" },
+            "cover": { "$ref": "#/$defs/symbol" },
+            "health": { "$ref": "#/$defs/symbol" },
+            "ammo": { "$ref": "#/$defs/symbol" }
+          },
+          "additionalProperties": false
+        },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "bot1": { "$ref": "#/$defs/bot" },
+    "bot2": { "$ref": "#/$defs/bot" }
+  },
+  "$defs": {
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 1 },
+    "bot": {
+      "type": "object",
+      "required": ["id", "skill"],
+      "properties": {
+        "id": { "type": "integer" },
+        "file": { "type": "string" },
+        "skill": { "type": "number", "minimum": 0, "maximum": 1 },
+        "params_file": { "type": "string" },
+        "guns_file": { "type": "string" },
+        "parameters": { "type": "object" },
+        "guns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "boolean" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

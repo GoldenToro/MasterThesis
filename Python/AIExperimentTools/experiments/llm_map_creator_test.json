@@ -1,0 +1,70 @@
+{
+  "experiment_name": "llm_map_creator_test",
+  "generator": "llm_map_creator",
+  "generator_settings": {
+    "seed": -1,
+    "map_count": 2,
+    "map_width": 64,
+    "map_height": 42,
+    "rules_text": "Create a balanced 2v2 science-fiction arena. Use two distant spawn areas, a contested center, two or three clear routes, moderate cover, a health pickup near the center, and ammo on a side route. Keep dead ends rare.",
+    "max_attempts_per_map": 2,
+    "max_prompt_examples": 1,
+    "example_map_paths": [
+      "generators/llm_map_creator/example_generated_maps.json"
+    ],
+    "grok": {
+      "model": "grok-4.5",
+      "api_key": "xai-U19NdV878CPFTE7gVIdBczfdsBRVsGMzoiqWMJyE2NQ2bi0TD9QXr4gaOQYjy6pnlIQbJcDRJZCu6PlR",
+      "base_url": "https://api.x.ai/v1",
+      "timeout_seconds": 240,
+      "max_output_tokens": 12000,
+      "reasoning_effort": "low",
+      "store": false
+    },
+    "repair_enabled": true,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.18,
+      "maximum_walkable_ratio": 0.65,
+      "require_single_connected_region": true
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "walkable_area_ratio",
+          "goal": "maximize",
+          "minimum": 0.18,
+          "maximum": 0.65
+        },
+        {
+          "name": "symmetry_x",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        {
+          "name": "repair_count",
+          "goal": "minimize",
+          "minimum": 0.0,
+          "maximum": 20.0
+        }
+      ]
+    }
+  },
+  "simulator_settings": {
+    "enabled": false
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [],
+    "create_diagram_fitness": true,
+    "create_diagram_for_metric": [
+      "walkable_area_ratio",
+      "symmetry_x",
+      "repair_count"
+    ]
+  }
+}

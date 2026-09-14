@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "experiment_name": "map_test_example",
+  "num_experiments": 1,
+  "game_length": 60,
+  "ready_duration": 1,
+  "score_duration": 0,
+  "respawn_duration": 3.0,
+  "paths": {
+    "bots_directory": "Bots",
+    "output_directory": "Output",
+    "output_subdirectory": ""
+  },
+  "logging": {
+    "save_map": true,
+    "log_positions": true,
+    "log_kill_distances": true,
+    "log_death_positions": true
+  },
+  "map": {
+    "map_id": "example_grid_24x24",
+    "width": 24,
+    "height": 24,
+    "map_scale": 2.0,
+    "symbols": {
+      "wall": "#",
+      "floor": ".",
+      "spawn": "S",
+      "cover": "C",
+      "health": "H",
+      "ammo": "A"
+    },
+    "grid": [
+      "########################",
+      "#S.........##..........#",
+      "#..........##..........#",
+      "#..........##..........#",
+      "#..........##..........#",
+      "#......................#",
+      "#......................#",
+      "#....######..######....#",
+      "#....#............#....#",
+      "#....#............#....#",
+      "#....#....H.......#....#",
+      "#.........####.........#",
+      "#.........####.........#",
+      "#....#.......A....#....#",
+      "#....#............#....#",
+      "#....#............#....#",
+      "#....######..######....#",
+      "#......................#",
+      "#......................#",
+      "#..........##..........#",
+      "#..........##..........#",
+      "#..........##..........#",
+      "#..........##.........S#",
+      "########################"
+    ]
+  },
+  "bot1": {
+    "id": 1,
+    "file": "assault",
+    "skill": 0.6,
+    "parameters": {
+      "eyeSpeed": 1.0,
+      "reflex": 1.0,
+      "prediction": 1.0,
+      "aiming": 1.0,
+      "speed": 20.0,
+      "movementSkill": 1.0,
+      "curiosity": 1.0,
+      "recklessness": "Neutral",
+      "fov": 90.0,
+      "maxRange": 120.0,
+      "eventReactionTimeout": 0.5
+    },
+    "guns": [
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "bot2": {
+    "id": 2,
+    "file": "sniper",
+    "skill": 0.6,
+    "parameters": {
+      "eyeSpeed": 0.8,
+      "reflex": 1.3,
+      "prediction": 0.7,
+      "aiming": 1.2,
+      "speed": 20.0,
+      "movementSkill": 0.6,
+      "curiosity": 1.5,
+      "recklessness": "Low",
+      "fov": 80.0,
+      "maxRange": 200.0,
+      "eventReactionTimeout": 0.5
+    },
+    "guns": [
+      false,
+      false,
+      false,
+      true
+    ]
+  }
+}

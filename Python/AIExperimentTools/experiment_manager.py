@@ -305,7 +305,7 @@ class ExperimentManager:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run FPS PCG experiments")
-    parser.add_argument("--config", type=Path, help="Run one experiment JSON")
+    parser.add_argument("-c", "--config", type=Path, help="Run one experiment JSON")
     parser.add_argument(
         "--dry-run",
         action="store_true",

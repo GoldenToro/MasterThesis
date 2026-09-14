@@ -49,7 +49,8 @@ namespace Managers.Map
 
         private void Update()
         {
-            if (!IsReady() && mapAssemblerScript.IsReady() && mapGeneratorScript.IsReady() &&
+            var generatorReady = mapGeneratorScript == null || mapGeneratorScript.IsReady();
+            if (!IsReady() && mapAssemblerScript.IsReady() && generatorReady &&
                 objectDisplacerScript.IsReady())
                 SetReady(true);
         }
@@ -124,7 +125,7 @@ namespace Managers.Map
         // Resets the map.
         public void ResetMap()
         {
-            mapGeneratorScript.ResetMapSize();
+            if (mapGeneratorScript != null) mapGeneratorScript.ResetMapSize();
             mapAssemblerScript.ClearMap();
             objectDisplacerScript.DestroyAllCustomObjects();
             SetReady(false);

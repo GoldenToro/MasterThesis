@@ -16,15 +16,53 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "generators.manual.manual_generator",
         "run",
     ),
+    "llm_map_creator": (
+        "generators.llm_map_creator.llm_map_creator",
+        "run",
+    ),
     "nsga2": (
         "generators.nsga2.nsga2_generator",
         "run",
     ),
+    "random_digger": (
+        "generators.constructive.random_digger_generator",
+        "run",
+    ),
+    "cellular_automata": (
+        "generators.constructive.cellular_automata_generator",
+        "run",
+    ),
+    "divisive": (
+        "generators.constructive.divisive_generator",
+        "run",
+    ),
+    "grid_graph": (
+        "generators.constructive.grid_graph_generator",
+        "run",
+    ),
+    "fps_pattern": (
+        "generators.constructive.fps_pattern_generator",
+        "run",
+    ),
+    "all_black": (
+        "generators.constructive.all_black_generator",
+        "run",
+    ),
+}
+
+_ALIASES: dict[str, str] = {
+    "digger": "random_digger",
+    "cellular": "cellular_automata",
+    "bsp": "divisive",
+    "binary_space_partition": "divisive",
+    "grid_graph_room": "grid_graph",
+    "fps_pattern_rule": "fps_pattern",
+    "all_black_constructive": "all_black",
 }
 
 
 def available_generators() -> tuple[str, ...]:
-    """Return all generator names registered in this toolkit."""
+    """Return canonical generator names registered in this toolkit."""
     return tuple(sorted(_GENERATORS))
 
 

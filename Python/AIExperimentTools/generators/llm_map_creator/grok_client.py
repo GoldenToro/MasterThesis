@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass
+from typing import Any
+
+from generators.llm_map_creator.schemas import DirectCanonicalMapResponse
+
+
+@dataclass(frozen=True)
+class MapResponseResult:
+    response: DirectCanonicalMapResponse
+    response_id: str | None
+    usage: dict[str, Any]
+    model: str
+
+
+class GrokMapCreator:
+    """Ask Grok to create one complete canonical JSON grid map."""
+
+    def __init__(self, settings: dict[str, Any]):
+        self.settings = dict(settings)
+        self.model = str(self.settings.get("model", "grok-4.5"))
+        self.base_url = str(self.settings.get("base_url", "https://api.x.ai/v1"))
+        self.api_key = str(self.settings.get("api_key"))
+        self.timeout_seconds = float(self.settings.get("timeout_seconds", 240.0))
+
+    def create_map(
+        self,
+        *,
+        rules_text: str,
+        map_id: str,
+        map_index: int,
+        map_count: int,
+        width: int,
+        height: int,
+        seed: int,
+        validation: dict[str, Any],
+        examples: list[dict[str, Any]],
+        attempt: int,
+        feedback: dict[str, Any] | None = None,
+    ) -> MapResponseResult:
+        if self.api_key is None or self.api_key.strip() == "":
+            raise RuntimeError(
+                f"Missing Grok API key. Set environment variable {self.api_key}."
+            )
+
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError(
+                "The direct LLM map creator requires the openai and pydantic "
+                "packages. Install dependencies from requirements.txt."
+            ) from exc
+
+        client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=self.timeout_seconds,
+        )
+
+        request: dict[str, Any] = {
+            "model": self.model,
+            "input": [
+                {"role": "system", "content": self._system_prompt()},
+                {
+                    "role": "user",
+                    "content": self._user_prompt(
+                        rules_text=rules_text,
+                        map_id=map_id,
+                        map_index=map_index,
+                        map_count=map_count,
+                        width=width,
+                        height=height,
+                        seed=seed,
+                        validation=validation,
+                        examples=examples,
+                        attempt=attempt,
+                        feedback=feedback,
+                    ),
+                },
+            ],
+            "text_format": DirectCanonicalMapResponse,
+            "store": bool(self.settings.get("store", False)),
+        }
+        max_output_tokens = self.settings.get("max_output_tokens")
+        if max_output_tokens is not None:
+            request["max_output_tokens"] = int(max_output_tokens)
+        reasoning_effort = self.settings.get("reasoning_effort")
+        if reasoning_effort is not None:
+            request["reasoning"] = {"effort": str(reasoning_effort)}
+
+        try:
+            api_response = client.responses.parse(**request)
+        except AttributeError as exc:
+            raise RuntimeError(
+                "The installed OpenAI SDK lacks responses.parse. Upgrade packages "
+                "from requirements.txt."
+            ) from exc
+
+        parsed = getattr(api_response, "output_parsed", None)
+        if parsed is None:
+            raise RuntimeError("Grok returned an empty parsed map response")
+        if isinstance(parsed, DirectCanonicalMapResponse) is False:
+            parsed = DirectCanonicalMapResponse.model_validate(parsed)
+
+        return MapResponseResult(
+            response=parsed,
+            response_id=getattr(api_response, "id", None),
+            usage=self._model_dump(getattr(api_response, "usage", None)),
+            model=self.model,
+        )
+
+    @staticmethod
+    def _system_prompt() -> str:
+        return (
+            "You create complete top-down FPS maps as canonical JSON. Return the "
+            "finished tile grid itself, never generator parameters, algorithms, "
+            "room graphs, or pseudocode. Every grid row is plain text. Use only "
+            "these symbols: # wall, . floor, S spawn, C cover, H health, A ammo. "
+            "All symbols except # are walkable. Keep the outer border sealed with "
+            "#. Build one connected playable region and place balanced, distant "
+            "spawns. Follow the requested dimensions exactly."
+        )
+
+    @staticmethod
+    def _user_prompt(
+        *,
+        rules_text: str,
+        map_id: str,
+        map_index: int,
+        map_count: int,
+        width: int,
+        height: int,
+        seed: int,
+        validation: dict[str, Any],
+        examples: list[dict[str, Any]],
+        attempt: int,
+        feedback: dict[str, Any] | None,
+    ) -> str:
+        sections = [
+            "Create a complete canonical JSON map.",
+            f"Map: {map_index + 1} of {map_count}",
+            f"Required map_id: {map_id}",
+            f"Dimensions: width {width}, height {height}",
+            f"Variation seed: {seed}",
+            "",
+            "Rules written by the designer:",
+            rules_text,
+            "",
+            "Canonical JSON requirements:",
+            f"- width equals {width}",
+            f"- height equals {height}",
+            f"- grid contains exactly {height} strings",
+            f"- every grid string contains exactly {width} symbols",
+            "- the first and last row contain only #",
+            "- the first and last symbol of every row are #",
+            "- use only # . S C H A",
+            "- all walkable cells form one connected region",
+            f"- validation settings: {json.dumps(validation, sort_keys=True)}",
+            "- metadata.design_summary briefly explains the layout",
+            "- metadata.features lists a few visible map features",
+        ]
+
+        if examples:
+            sections.extend(
+                [
+                    "",
+                    "Optional examples of the expected output format and quality:",
+                    json.dumps(examples, ensure_ascii=False, indent=2),
+                ]
+            )
+
+        if feedback:
+            sections.extend(
+                [
+                    "",
+                    f"Correction attempt {attempt}:",
+                    "Improve the previous candidate using this local validation feedback:",
+                    json.dumps(feedback, ensure_ascii=False, indent=2),
+                ]
+            )
+
+        sections.extend(
+            [
+                "",
+                "Return the complete JSON object as the final answer.",
+            ]
+        )
+        return "\n".join(sections)
+
+    @staticmethod
+    def _model_dump(value: Any) -> dict[str, Any]:
+        if value is None:
+            return {}
+        if hasattr(value, "model_dump"):
+            result = value.model_dump()
+            return dict(result) if isinstance(result, dict) else {"value": result}
+        if isinstance(value, dict):
+            return dict(value)
+        return {"value": str(value)}

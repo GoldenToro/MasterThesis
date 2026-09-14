@@ -79,7 +79,7 @@ namespace Managers.Mode
             int bot2ID,
             BotCharacteristics bot2Params,
             bool[] activeGunsBot2,
-            SLMapManager mapManager,
+            MapManager mapManager,
             SpawnPointManager spawnPointManager,
             int gameDuration = 600,
             int readyDuration = 1,

@@ -4,3 +4,5 @@ matplotlib>=3.7
 deap>=1.4
 jsonpickle>=3.0
 networkx>=3.2
+openai>=1.68
+pydantic>=2.7

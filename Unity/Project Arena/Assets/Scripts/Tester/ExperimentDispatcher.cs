@@ -16,6 +16,9 @@ namespace Tester
         private const string GENOME_TESTER_TEST_NAME = "BOT_GENOME_TESTER";
         private const string GENOME_TESTER_TEST_SCENE = "GenomeTester";
 
+        private const string MAP_TESTER_TEST_NAME = "BOT_MAP_TESTER";
+        private const string MAP_TESTER_TEST_SCENE = "MapEvaluationTester";
+
         private void Awake()
         {
             var args = Environment.GetCommandLineArgs();
@@ -39,12 +42,17 @@ namespace Tester
                     SceneManager.LoadScene(GENOME_TESTER_TEST_SCENE);
                     break;
 
+                case MAP_TESTER_TEST_NAME:
+                    SceneManager.LoadScene(MAP_TESTER_TEST_SCENE);
+                    break;
+
                 default:
                     QuitWithError(
                         "Unknown experiment type " + experimentType + "\n" +
                         "Known experiments are:\n" +
                         // ROCKET_SUICIDE_TEST_NAME + ",\n"
-                        GENOME_TESTER_TEST_NAME + ",\n"
+                        GENOME_TESTER_TEST_NAME + ",\n" +
+                        MAP_TESTER_TEST_NAME + ",\n"
                     );
                     return;
             }

@@ -7,7 +7,7 @@ import random
 from typing import Any
 
 from generators.base_generator import (
-    BaseGenerator,
+    ExperimentSession,
     EvaluationFunction,
     EvaluationJob,
     GeneratorContext,
@@ -15,7 +15,7 @@ from generators.base_generator import (
 from map_schema.canonical_map import CanonicalMap
 
 
-class NSGA2Generator(BaseGenerator):
+class NSGA2Generator(ExperimentSession):
     """NSGA-II adapter around the legacy Project Arena All-Black genome.
 
     This class owns NSGA-II generation, mutation, crossover, selection, and the

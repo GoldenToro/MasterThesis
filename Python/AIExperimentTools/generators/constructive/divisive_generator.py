@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from generators.constructive.common import (
     Rect,
     blank_grid,
@@ -27,7 +27,7 @@ class _Node:
         return self.left is None and self.right is None
 
 
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     return run_constructive(base_generator, _generate, "divisive")
 
 

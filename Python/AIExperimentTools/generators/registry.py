@@ -5,10 +5,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from generators.base_generator import BaseGenerator
+    from experiment_session import ExperimentSession
 
 
-GeneratorRunner = Callable[["BaseGenerator"], list[str]]
+GeneratorRunner = Callable[["ExperimentSession"], list[str]]
 
 
 _GENERATORS: dict[str, tuple[str, str]] = {

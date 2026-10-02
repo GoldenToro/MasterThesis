@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from generators.constructive.common import (
     Rect,
     blank_grid,
@@ -14,7 +14,7 @@ from generators.constructive.common import (
 from map_schema.canonical_map import CanonicalMap
 
 
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     return run_constructive(base_generator, _generate, "all_black")
 
 

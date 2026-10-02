@@ -5,18 +5,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from generators.llm_map_creator.grok_client import GrokMapCreator, MapResponseResult
 from generators.llm_map_creator.map_processing import DirectMapProcessor
 from generators.llm_map_creator.schemas import DirectCanonicalMapResponse
 from map_schema.canonical_map import CanonicalMap
 from map_schema.map_validator import MapValidator
-
+from candidate import Candidate
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     """Generate complete canonical grid maps directly with Grok."""
     settings = base_generator.generator_settings
     map_count = int(settings.get("map_count", 4))
@@ -190,9 +190,22 @@ def run(base_generator: BaseGenerator) -> list[str]:
     )
 
     LOGGER.info("Created %s complete canonical maps with direct LLM output.", map_count)
-    epoch_dir = base_generator.save_epoch_maps(0, generated_maps)
-    table = base_generator.evaluate_epoch(epoch_dir)
-    final_map_ids = [str(value) for value in table["map_id"]]
+    LOGGER.info(
+        "Created %s complete canonical maps with direct LLM output.",
+        map_count,
+    )
+
+    candidates = [
+        Candidate(canonical_map=item)
+        for item in generated_maps
+    ]
+    evaluated = base_generator.evaluate_candidates(candidates, epoch=0)
+    final_map_ids = [
+        candidate.map_id
+        for candidate in evaluated
+    ]
+
+    epoch_dir = base_generator.output_dir / "epoch_0000"
     (epoch_dir / "checkpoint_summary.json").write_text(
         json.dumps(
             {
@@ -205,10 +218,11 @@ def run(base_generator: BaseGenerator) -> list[str]:
         ),
         encoding="utf-8",
     )
+
     return final_map_ids
 
 
-def _load_examples(base_generator: BaseGenerator) -> list[dict[str, Any]]:
+def _load_examples(base_generator: ExperimentSession) -> list[dict[str, Any]]:
     settings = base_generator.generator_settings
     examples: list[dict[str, Any]] = []
     inline = settings.get("examples", [])
@@ -230,7 +244,7 @@ def _load_examples(base_generator: BaseGenerator) -> list[dict[str, Any]]:
     return examples[:maximum_examples]
 
 def _save_attempt(
-    base_generator: BaseGenerator,
+    base_generator: ExperimentSession,
     map_id: str,
     attempt: int,
     payload: dict[str, Any],
@@ -242,7 +256,7 @@ def _save_attempt(
     return path
 
 
-def _resolve_path(base_generator: BaseGenerator, value: Any) -> Path:
+def _resolve_path(base_generator: ExperimentSession, value: Any) -> Path:
     path = Path(str(value))
     if path.is_absolute() is False:
         path = base_generator.framework_root / path

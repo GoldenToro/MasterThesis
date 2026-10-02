@@ -16,7 +16,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from analysis.experiment_analyzer import ExperimentAnalyzer
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
@@ -77,7 +77,7 @@ class ExperimentManager:
             experiment["seed"],
         )
 
-        base_generator = BaseGenerator(
+        base_generator = ExperimentSession(
             framework_root=self.framework_root,
             output_dir=run_dir,
             technical_settings=self.settings,

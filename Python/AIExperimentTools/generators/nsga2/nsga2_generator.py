@@ -8,11 +8,11 @@ from time import perf_counter
 from hashlib import sha1
 from typing import Any
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from map_schema.canonical_map import CanonicalMap
+from candidate import Candidate
 
-
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     """Run NSGA-II and return the map IDs of the final population."""
     try:
         from deap import base, creator, tools
@@ -112,45 +112,38 @@ def run(base_generator: BaseGenerator) -> list[str]:
             epoch: int,
             numeric_id_start: int = 0,
     ) -> None:
-        if len(individuals) == 0:
+        if not individuals:
             return
 
-        maps = [
-            create_canonical_map(
-                individual,
-                epoch,
-                numeric_id_start + offset,
+        candidates = [
+            Candidate(
+                canonical_map=create_canonical_map(
+                    individual,
+                    epoch,
+                    numeric_id_start + offset,
+                    ),
+                genome=individual,
             )
             for offset, individual in enumerate(individuals)
         ]
 
-        epoch_dir = base_generator.save_epoch_maps(epoch, maps)
-        table = base_generator.evaluate_epoch(epoch_dir)
+        evaluated = base_generator.evaluate_candidates(
+            candidates,
+            epoch=epoch,
+        )
 
-        current_map_ids = {canonical_map.map_id for canonical_map in maps}
-        table = table[
-            np.isin(
-                table["map_id"],
-                list(current_map_ids),
+        for candidate in evaluated:
+            if candidate.evaluation is None:
+                raise RuntimeError(
+                    f"Candidate '{candidate.map_id}' has no evaluation"
+                )
+
+            metrics = candidate.evaluation["metrics"]
+            candidate.genome.fitness.values = tuple(
+                float(metrics[name])
+                for name in objective_names
             )
-        ]
-
-        if len(table) != len(individuals):
-            raise RuntimeError(
-                f"Expected {len(individuals)} evaluation rows, "
-                f"received {len(table)}"
-            )
-
-        table = table[np.argsort(table["id"])]
-
-        for individual, row in zip(individuals, table):
-            individual.fitness.values = tuple(
-                float(row[name]) for name in objective_names
-            )
-            individual.result_map_id = str(row["map_id"])
-
-
-    import numpy as np
+            candidate.genome.result_map_id = candidate.map_id
 
     # keep generating and evaluating candidates until the population contains
     # exactly population_size individuals whose first objective is nonzero.
@@ -222,7 +215,7 @@ def run(base_generator: BaseGenerator) -> list[str]:
 
 
 def _save_checkpoint(
-    base_generator: BaseGenerator,
+    base_generator: ExperimentSession,
     epoch: int,
     population: list[Any],
 ) -> None:

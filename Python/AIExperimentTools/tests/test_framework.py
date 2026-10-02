@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 
 from analysis.experiment_analyzer import ExperimentAnalyzer
 from experiment_manager import ExperimentManager
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from generators.manual.manual_generator import load_text_map
 from generators.registry import available_generators, resolve_generator_name
 from map_schema.canonical_map import CanonicalMap
@@ -301,7 +301,7 @@ class FrameworkTest(unittest.TestCase):
             payload = {"experiment_name": "candidate_a", "map": {"id": "a"}}
             source.write_text(json.dumps(payload), encoding="utf-8")
 
-            base = BaseGenerator(ROOT, output, {}, experiment)
+            base = ExperimentSession(ROOT, output, {}, experiment)
             copied = base.copy_final_candidate_maps(
                 ["candidate_a", "candidate_a", "missing_candidate"]
             )

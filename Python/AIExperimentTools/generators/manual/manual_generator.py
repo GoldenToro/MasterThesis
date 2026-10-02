@@ -5,20 +5,19 @@ import logging
 import re
 from pathlib import Path
 from typing import Iterable
+from candidate import Candidate
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from map_schema.canonical_map import ALLOWED_SYMBOLS, CanonicalMap
 
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
-
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     """Load every text map in the configured folder and evaluate it once.
 
-    One ``*.txt`` file represents one map. The text file contains only canonical
-    grid symbols and uses the same top-to-bottom row order as ``CanonicalMap``.
-    All maps are placed in epoch 0 and returned as final candidates.
+    One text file represents one map. All maps are placed in epoch 0
+    and returned as final candidates.
     """
     map_directory = _resolve_map_directory(base_generator)
     map_files = sorted(
@@ -37,6 +36,7 @@ def run(base_generator: BaseGenerator) -> list[str]:
 
     maps: list[CanonicalMap] = []
     used_ids: set[str] = set()
+
     for path in map_files:
         map_id = _unique_map_id(_safe_map_id(path.stem), used_ids)
         canonical_map = load_text_map(
@@ -45,6 +45,7 @@ def run(base_generator: BaseGenerator) -> list[str]:
             source_root=base_generator.framework_root,
         )
         maps.append(canonical_map)
+
         LOGGER.info(
             "    Loaded %s (%sx%s).",
             path.name,
@@ -52,12 +53,22 @@ def run(base_generator: BaseGenerator) -> list[str]:
             canonical_map.height,
         )
 
-    epoch_dir = base_generator.save_epoch_maps(0, maps)
-    table = base_generator.evaluate_epoch(epoch_dir)
-    final_map_ids = [str(value) for value in table["map_id"]]
+    candidates = [
+        Candidate(canonical_map=item)
+        for item in maps
+    ]
+    evaluated = base_generator.evaluate_candidates(
+        candidates,
+        epoch=0,
+    )
+    final_map_ids = [
+        candidate.map_id
+        for candidate in evaluated
+    ]
 
-    # Analysis uses this lightweight file to know the complete selected
-    # population for the epoch, matching the NSGA-II checkpoint summary format.
+    epoch_dir = base_generator.output_dir / "epoch_0000"
+
+    # Analysis uses this file to identify the selected population.
     (epoch_dir / "checkpoint_summary.json").write_text(
         json.dumps(
             {
@@ -139,7 +150,7 @@ def load_text_map(
     )
 
 
-def _resolve_map_directory(base_generator: BaseGenerator) -> Path:
+def _resolve_map_directory(base_generator: ExperimentSession) -> Path:
     configured = base_generator.generator_settings.get("maps_directory")
     if configured is not None:
         directory = Path(str(configured))

@@ -8,7 +8,8 @@ from hashlib import sha1
 from time import perf_counter
 from typing import Callable, Iterable
 
-from generators.base_generator import BaseGenerator
+from candidate import Candidate
+from experiment_session import ExperimentSession
 from map_schema.canonical_map import COVER, FLOOR, WALL, CanonicalMap
 
 
@@ -44,10 +45,8 @@ class Rect:
 
 
 MapFactory = Callable[[int, int, random.Random, dict, str], CanonicalMap]
-
-
 def run_constructive(
-    base_generator: BaseGenerator,
+    base_generator: ExperimentSession,
     factory: MapFactory,
     source_name: str,
 ) -> list[str]:
@@ -56,18 +55,26 @@ def run_constructive(
     population_size = int(settings["population_size"])
     width = int(settings["map_width"])
     height = int(settings["map_height"])
+
     if population_size <= 0:
         raise ValueError("population_size must be positive")
     if width < 8 or height < 8:
-        raise ValueError("Constructive generators require map dimensions of at least 8x8")
+        raise ValueError(
+            "Constructive generators require map dimensions of at least 8x8"
+        )
 
     maps: list[CanonicalMap] = []
+
     for numeric_id in range(population_size):
         map_id = f"{source_name}_e0000_i{numeric_id:04d}"
-        rng = random.Random(_derived_seed(base_generator.seed, source_name, numeric_id))
+        rng = random.Random(
+            _derived_seed(base_generator.seed, source_name, numeric_id)
+        )
+
         started = perf_counter()
         canonical_map = factory(width, height, rng, settings, map_id)
         elapsed = perf_counter() - started
+
         metadata = dict(canonical_map.metadata)
         metadata.update(
             {
@@ -80,9 +87,17 @@ def run_constructive(
         )
         maps.append(replace(canonical_map, metadata=metadata))
 
-    epoch_dir = base_generator.save_epoch_maps(0, maps)
-    table = base_generator.evaluate_epoch(epoch_dir)
-    final_map_ids = [str(value) for value in table["map_id"]]
+    candidates = [
+        Candidate(canonical_map=item)
+        for item in maps
+    ]
+    evaluated = base_generator.evaluate_candidates(candidates, epoch=0)
+    final_map_ids = [
+        candidate.map_id
+        for candidate in evaluated
+    ]
+
+    epoch_dir = base_generator.output_dir / "epoch_0000"
     (epoch_dir / "checkpoint_summary.json").write_text(
         json.dumps(
             {
@@ -95,6 +110,7 @@ def run_constructive(
         ),
         encoding="utf-8",
     )
+
     return final_map_ids
 
 

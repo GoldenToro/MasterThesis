@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from random import Random
 
-from generators.base_generator import BaseGenerator
+from experiment_session import ExperimentSession
 from generators.constructive.common import (
     Rect,
     blank_grid,
@@ -17,7 +17,7 @@ from map_schema.canonical_map import CanonicalMap
 
 # Not happy with this algo , have to bring in randomizing
 
-def run(base_generator: BaseGenerator) -> list[str]:
+def run(base_generator: ExperimentSession) -> list[str]:
     return run_constructive(base_generator, _generate, "fps_pattern")
 
 

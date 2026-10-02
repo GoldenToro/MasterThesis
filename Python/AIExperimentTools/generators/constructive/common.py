@@ -10,7 +10,7 @@ from typing import Callable, Iterable
 
 from candidate import Candidate
 from experiment_session import ExperimentSession
-from map_schema.canonical_map import COVER, FLOOR, WALL, CanonicalMap
+from map_schema.canonical_map import FLOOR, WALL, CanonicalMap
 
 
 @dataclass(frozen=True)
@@ -223,23 +223,6 @@ def connect_components(
         corridor_count += 1
         components = floor_components(grid)
     return corridor_count
-
-
-def place_symmetric_cover(
-    grid: list[list[str]],
-    points: Iterable[tuple[int, int]],
-) -> int:
-    width = len(grid[0])
-    placed: set[tuple[int, int]] = set()
-    for x, y in points:
-        for candidate in ((x, y), (width - 1 - x, y)):
-            cx, cy = candidate
-            if 0 < cx < width - 1 and 0 < cy < len(grid) - 1:
-                if grid[cy][cx] == FLOOR:
-                    grid[cy][cx] = COVER
-                    placed.add(candidate)
-    return len(placed)
-
 
 def _component_distance(
     first: set[tuple[int, int]],

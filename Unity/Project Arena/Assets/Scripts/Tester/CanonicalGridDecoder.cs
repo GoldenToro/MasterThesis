@@ -44,7 +44,6 @@ namespace Tester
             var wall = ReadSymbol(symbols.wall, '#', "wall");
             var floor = ReadSymbol(symbols.floor, '.', "floor");
             var spawn = ReadSymbol(symbols.spawn, 'S', "spawn");
-            var cover = ReadSymbol(symbols.cover, 'C', "cover");
             var health = ReadSymbol(symbols.health, 'H', "health");
             var ammo = ReadSymbol(symbols.ammo, 'A', "ammo");
 
@@ -61,7 +60,7 @@ namespace Tester
                 for (var column = 0; column < width; column++)
                 {
                     var source = line[column];
-                    var target = ConvertSymbol(source, wall, floor, spawn, cover, health, ammo);
+                    var target = ConvertSymbol(source, wall, floor, spawn, health, ammo);
                     result[row, column] = target;
                     text.Append(target);
                     if (target == 's') spawnCount++;
@@ -81,14 +80,12 @@ namespace Tester
             char wall,
             char floor,
             char spawn,
-            char cover,
             char health,
             char ammo)
         {
             if (source == wall || source == 'w') return 'w';
             if (source == floor || source == 'r') return 'r';
             if (source == spawn || source == 's') return 's';
-            if (source == cover || source == 'd') return 'd';
             if (source == health || source == 'h') return 'h';
             if (source == ammo || source == 'a') return 'a';
 

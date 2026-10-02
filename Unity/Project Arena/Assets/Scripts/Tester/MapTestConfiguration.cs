@@ -55,7 +55,6 @@ namespace Tester
         [JsonProperty("wall")] public string wall = "#";
         [JsonProperty("floor")] public string floor = ".";
         [JsonProperty("spawn")] public string spawn = "S";
-        [JsonProperty("cover")] public string cover = "C";
         [JsonProperty("health")] public string health = "H";
         [JsonProperty("ammo")] public string ammo = "A";
     }

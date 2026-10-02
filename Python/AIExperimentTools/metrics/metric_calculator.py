@@ -10,7 +10,6 @@ from typing import Any, Callable
 
 from map_schema.canonical_map import (
     AMMO,
-    COVER,
     FLOOR,
     HEALTH,
     SPAWN,
@@ -107,7 +106,6 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
     "room_count",
     "corridor_count",
     "spawn_count",
-    "cover_object_count",
     "pickup_count",
     "walkable_area_ratio",
     "largest_navigable_region_ratio",
@@ -133,8 +131,6 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
     "spawn_distance_balance",
     "spawn_exposure",
     "spawn_escape_routes",
-    "cover_density",
-    "cover_distribution_balance",
     "number_of_frags_bot_1",
     "number_of_frags_bot_2",
     "number_of_shots_bot_1",
@@ -644,29 +640,6 @@ def _spawn_escape_routes(context: MetricContext) -> float | None:
         values.append(exits / 4.0)
     return mean(values) if values else None
 
-
-def _cover_density(context: MetricContext) -> float | None:
-    covers = _symbol_count(context, COVER)
-    walkable = _walkable_tile_count(context)
-    return covers / walkable if covers is not None and walkable else None
-
-
-def _cover_distribution_balance(context: MetricContext) -> float | None:
-    canonical_map = context.canonical_map
-    if canonical_map is None:
-        return None
-    covers = canonical_map.cells_with({COVER})
-    if len(covers) == 0:
-        return 0.0
-    counts = [0, 0, 0, 0]
-    for x, y in covers:
-        index = (1 if x >= canonical_map.width / 2 else 0) + (2 if y >= canonical_map.height / 2 else 0)
-        counts[index] += 1
-    probabilities = [count / len(covers) for count in counts if count]
-    entropy = -sum(value * math.log(value) for value in probabilities)
-    return entropy / math.log(4)
-
-
 def _kill_difference(context: MetricContext) -> float | None:
     values = []
     for record in context.match_records:
@@ -1034,7 +1007,6 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
     "room_count": lambda context: _metadata_number(context, "room_count"),
     "corridor_count": lambda context: _metadata_number(context, "corridor_count"),
     "spawn_count": lambda context: _symbol_count(context, SPAWN),
-    "cover_object_count": lambda context: _symbol_count(context, COVER),
     "pickup_count": lambda context: (
         (_symbol_count(context, HEALTH) or 0) + (_symbol_count(context, AMMO) or 0)
         if context.canonical_map else None
@@ -1065,8 +1037,6 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
     "spawn_distance_balance": _spawn_distance_balance,
     "spawn_exposure": _spawn_exposure,
     "spawn_escape_routes": _spawn_escape_routes,
-    "cover_density": _cover_density,
-    "cover_distribution_balance": _cover_distribution_balance,
     "number_of_frags_bot_1": _direct_unity("numberOfFrags1"),
     "number_of_frags_bot_2": _direct_unity("numberOfFrags2"),
     "number_of_shots_bot_1": _direct_unity("numberOfShots1"),

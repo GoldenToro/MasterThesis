@@ -25,8 +25,7 @@
     "route_count_min": 2,
     "route_count_max": 5,
     "corridor_width_min": 1,
-    "corridor_width_max": 3,
-    "place_cover": false
+    "corridor_width_max": 3
   },
   "simulator_settings": {
     "enabled": true,

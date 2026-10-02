@@ -8,11 +8,10 @@ from typing import Any, Iterable
 WALL = "#"
 FLOOR = "."
 SPAWN = "S"
-COVER = "C"
 HEALTH = "H"
 AMMO = "A"
-ALLOWED_SYMBOLS = frozenset({WALL, FLOOR, SPAWN, COVER, HEALTH, AMMO})
-WALKABLE_SYMBOLS = frozenset({FLOOR, SPAWN, COVER, HEALTH, AMMO})
+ALLOWED_SYMBOLS = frozenset({WALL, FLOOR, SPAWN, HEALTH, AMMO})
+WALKABLE_SYMBOLS = frozenset({FLOOR, SPAWN, HEALTH, AMMO})
 
 
 @dataclass(frozen=True)

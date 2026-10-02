@@ -10,7 +10,6 @@ from generators.constructive.common import (
     carve_corridor,
     carve_rect,
     grid_rows,
-    place_symmetric_cover,
     run_constructive,
 )
 from map_schema.canonical_map import CanonicalMap
@@ -33,7 +32,6 @@ def _generate(
 
     corridor_width = max(1, int(settings.get("corridor_width", 2)))
     route_count = random.randrange(1, 10)
-    place_cover = bool(settings.get("place_cover", False))
 
     side_width = max(5, width // 8)
     side_height = max(6, height // 3)
@@ -95,15 +93,6 @@ def _generate(
     connect(top_room.center, (arena.center[0], arena.y), False)
     connect(bottom_room.center, (arena.center[0], arena.bottom - 1), False)
 
-    cover_count = 0
-    if place_cover:
-        cover_points = [
-            (arena.x + arena.width // 3, arena.y + arena.height // 3),
-            (arena.x + arena.width // 3, arena.bottom - arena.height // 3 - 1),
-            (left_room.x + left_room.width // 2, left_room.y + 1),
-        ]
-        cover_count = place_symmetric_cover(grid, cover_points)
-
     return CanonicalMap(
         map_id=map_id,
         width=width,
@@ -113,7 +102,6 @@ def _generate(
             "genome_representation_type": "fps_pattern_rules",
             "room_count": len(rooms),
             "corridor_count": len(connections),
-            "cover_object_count_generated": cover_count,
             "fps_pattern": "symmetric_multi_route",
             "route_count": route_count,
         },

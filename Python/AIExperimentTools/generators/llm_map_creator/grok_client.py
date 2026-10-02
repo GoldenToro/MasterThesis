@@ -118,7 +118,7 @@ class GrokMapCreator:
             "You create complete top-down FPS maps as canonical JSON. Return the "
             "finished tile grid itself, never generator parameters, algorithms, "
             "room graphs, or pseudocode. Every grid row is plain text. Use only "
-            "these symbols: # wall, . floor, S spawn, C cover, H health, A ammo. "
+            "these symbols: # wall, . floor, S spawn, H health, A ammo. "
             "All symbols except # are walkable. Keep the outer border sealed with "
             "#. Build one connected playable region and place balanced, distant "
             "spawns. Follow the requested dimensions exactly."
@@ -156,7 +156,7 @@ class GrokMapCreator:
             f"- every grid string contains exactly {width} symbols",
             "- the first and last row contain only #",
             "- the first and last symbol of every row are #",
-            "- use only # . S C H A",
+            "- use only # . S H A",
             "- all walkable cells form one connected region",
             f"- validation settings: {json.dumps(validation, sort_keys=True)}",
             "- metadata.design_summary briefly explains the layout",

@@ -34,7 +34,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
     rules_text = str(
         settings.get(
             "rules_text",
-            "Create a balanced competitive FPS map with clear routes, useful cover, "
+            "Create a balanced competitive FPS map with clear routes, "
             "distant spawns, one contested center, and at least one flank.",
         )
     ).strip()

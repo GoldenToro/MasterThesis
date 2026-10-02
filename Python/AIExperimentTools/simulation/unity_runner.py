@@ -165,7 +165,6 @@ class UnityRunner:
                 "wall": "#",
                 "floor": ".",
                 "spawn": "S",
-                "cover": "C",
                 "health": "H",
                 "ammo": "A",
             }

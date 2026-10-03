@@ -82,7 +82,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
         encoding="utf-8",
     )
 
-    return final_map_ids
+    yield final_map_ids
 
 
 def load_text_map(

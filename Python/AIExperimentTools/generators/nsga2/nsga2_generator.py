@@ -47,7 +47,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
             f"{supported_size[0]}x{supported_size[1]} maps"
         )
     population_size = int(settings["population_size"])
-    num_epochs = int(settings["num_epochs"])
+
     if population_size < 4 or population_size % 4 != 0:
         raise ValueError(
             "NSGA-II population_size must be a multiple of four and at least four"
@@ -162,43 +162,19 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 for name in objective_names
             )
             candidate.genome.result_map_id = candidate.map_id
+    population = [toolbox.individual() for _ in range(population_size)]
+    evaluate_batch(population, epoch=0)
 
-    # keep generating and evaluating candidates until the population contains
-    # exactly population_size individuals whose first objective is nonzero.
-    population: list[Any] = []
-    next_initial_numeric_id = 0
-    while len(population) < population_size:
-        remaining = population_size - len(population)
-        print(f"Initial population: {remaining} valid individuals still required")
-
-        candidates = [toolbox.individual() for _ in range(remaining)]
-        evaluate_batch(
-            candidates,
-            epoch=0,
-            numeric_id_start=next_initial_numeric_id,
-        )
-        next_initial_numeric_id += len(candidates)
-
-        for candidate in candidates:
-            first_objective = float(candidate.fitness.values[0])
-            if first_objective != 0.0:
-                population.append(candidate)
-            else:
-                print(
-                    "Drop initial individual "
-                    f"'{candidate.result_map_id}' because "
-                    f"{objective_names[0]} equals 0"
-                )
-
-    # Assign Pareto rank and crowding distance. This performs no survivor
-    # reduction because the requested size equals the population size.
-    population = toolbox.select(population, len(population))
+    population = toolbox.select(population, population_size)
     _save_checkpoint(base_generator, 0, population)
+
+    yield [str(individual.result_map_id) for individual in population]
 
     mate_probability = float(settings.get("mate_probability", 0.3))
     mutate_probability = float(settings.get("mutate_probability", 0.3))
+    epoch = 1
 
-    for epoch in range(1, num_epochs + 1):
+    while True:
         offspring = tools.selTournamentDCD(population, len(population))
         offspring = [toolbox.clone(individual) for individual in offspring]
 
@@ -217,7 +193,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
         pending = [
             individual
             for individual in offspring
-            if individual.fitness.valid is False
+            if not individual.fitness.valid
         ]
         evaluate_batch(pending, epoch)
         population = toolbox.select(population + offspring, population_size)
@@ -225,12 +201,8 @@ def run(base_generator: ExperimentSession) -> list[str]:
         if bool(settings.get("checkpoint_every_epoch", True)):
             _save_checkpoint(base_generator, epoch, population)
 
-    final_map_ids = [
-        str(getattr(individual, "result_map_id"))
-        for individual in population
-    ]
-    return final_map_ids
-
+        yield [str(individual.result_map_id) for individual in population]
+        epoch += 1
 
 def _save_checkpoint(
     base_generator: ExperimentSession,

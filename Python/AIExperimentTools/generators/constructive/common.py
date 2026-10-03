@@ -111,7 +111,7 @@ def run_constructive(
         encoding="utf-8",
     )
 
-    return final_map_ids
+    yield final_map_ids
 
 
 def blank_grid(width: int, height: int) -> list[list[str]]:

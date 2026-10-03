@@ -10,6 +10,9 @@ from candidate import Candidate
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable
+import math
+from collections.abc import Generator
+from time import monotonic
 
 import numpy as np
 
@@ -21,7 +24,6 @@ from map_schema.map_completion import complete_map, strip_objects
 from metrics.metric_calculator import MetricContext, calculate_metrics, normalize_metric_name
 from generators.registry import load_generator
 from simulation.unity_runner import UnityRunner
-
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
@@ -38,11 +40,11 @@ class ExperimentSession:
     """
 
     def __init__(
-        self,
-        framework_root: Path,
-        output_dir: Path,
-        technical_settings: dict[str, Any],
-        experiment: dict[str, Any],
+            self,
+            framework_root: Path,
+            output_dir: Path,
+            technical_settings: dict[str, Any],
+            experiment: dict[str, Any],
     ) -> None:
         self.framework_root = framework_root
         self.output_dir = output_dir
@@ -68,10 +70,50 @@ class ExperimentSession:
         ]
 
     def start(self) -> list[str]:
-        """Load the selected generator through the generator registry."""
+        """Control generation limits and select the final outputs."""
+        settings = self.generator_settings
+        num_epochs = settings.get("num_epochs", 0)
+        seconds = settings.get("max_time_seconds", 0)
+        final_count = settings.get("final_map_count")
+
+        if type(num_epochs) is not int or num_epochs < 0:
+            raise ValueError("num_epochs must be a non-negative integer")
+        if (
+                type(seconds) not in (int, float)
+                or not math.isfinite(seconds)
+                or seconds < 0
+        ):
+            raise ValueError("max_time_seconds must be finite and non-negative")
+        if final_count is not None and (
+                type(final_count) is not int or final_count <= 0
+        ):
+            raise ValueError("final_map_count must be a positive integer")
+
         run_function = load_generator(self.generator_name)
-        result = run_function(self)
-        return list(result or [])
+        steps = run_function(self)
+        if not isinstance(steps, Generator):
+            raise TypeError("Generator run() must yield completed populations")
+
+        deadline = monotonic() + seconds if seconds > 0 else None
+        population: list[str] = []
+
+        try:
+            # Initial generation, followed by at most num_epochs updates.
+            for _ in range(num_epochs + 1):
+                if deadline is not None and monotonic() >= deadline:
+                    LOGGER.info("Generation time limit reached.")
+                    break
+
+                try:
+                    population = next(steps)
+                except StopIteration:
+                    break
+        finally:
+            steps.close()
+
+        final_map_ids = self._select_final_maps(population)
+        self.mark_final_candidates(final_map_ids)
+        return final_map_ids
 
     def evaluate_candidates(
             self,
@@ -151,14 +193,14 @@ class ExperimentSession:
             save_canonical_map(
                 normalized_map,
                 epoch_dir / f"{normalized_map.map_id}.map.json",
-                )
+            )
 
         return epoch_dir
 
     def evaluate_epoch(
-        self,
-        epoch_dir: Path,
-        map_ids: set[str] | None = None,
+            self,
+            epoch_dir: Path,
+            map_ids: set[str] | None = None,
     ) -> np.ndarray:
         """Evaluate selected saved maps, or all maps when no IDs are given."""
         map_files = sorted(epoch_dir.glob("*.map.json"))
@@ -216,6 +258,7 @@ class ExperimentSession:
         LOGGER.info("Finished evaluating %s.", epoch_dir.name)
 
         return self._records_to_numpy(records)
+
     def mark_final_candidates(self, map_ids: Iterable[str]) -> None:
         """Mark the final population inside the existing results.csv file."""
         if self.results_csv.is_file() is False:
@@ -297,7 +340,7 @@ class ExperimentSession:
                     shutil.rmtree(directory)
 
             for checkpoint_path in self.output_dir.glob(
-                "epoch_*/checkpoint.pkl"
+                    "epoch_*/checkpoint.pkl"
             ):
                 checkpoint_path.unlink()
 
@@ -307,10 +350,11 @@ class ExperimentSession:
         self._remove_empty_directories(raw_dir)
         if raw_dir.is_dir() and next(raw_dir.iterdir(), None) is None:
             raw_dir.rmdir()
+
     def _evaluate_map(
-        self,
-        canonical_map: CanonicalMap,
-        epoch_dir: Path,
+            self,
+            canonical_map: CanonicalMap,
+            epoch_dir: Path,
     ) -> dict[str, Any]:
         generation = self.generator_settings
         completion = generation["map_completion"]
@@ -340,20 +384,20 @@ class ExperimentSession:
         repair_error = None
 
         dimensions_match = (
-            validation_settings["expected_width"]
-            in (None, canonical_map.width)
-            and validation_settings["expected_height"]
-            in (None, canonical_map.height)
+                validation_settings["expected_width"]
+                in (None, canonical_map.width)
+                and validation_settings["expected_height"]
+                in (None, canonical_map.height)
         )
         needs_connection = (
-            bool(layout_settings.get("require_single_connected_region", True))
-            and validation_before.measured["connected_components"] > 1
+                bool(layout_settings.get("require_single_connected_region", True))
+                and validation_before.measured["connected_components"] > 1
         )
 
         if (
-            generation.get("repair_enabled", False)
-            and dimensions_match
-            and needs_connection
+                generation.get("repair_enabled", False)
+                and dimensions_match
+                and needs_connection
         ):
             try:
                 canonical_map, repair = MapRepairer().repair(
@@ -445,10 +489,10 @@ class ExperimentSession:
                 "validation": validation.to_dict(),
             },
             raw_map_dir=(
-                self.output_dir
-                / "_raw"
-                / f"epoch_{epoch:04d}"
-                / canonical_map.map_id
+                    self.output_dir
+                    / "_raw"
+                    / f"epoch_{epoch:04d}"
+                    / canonical_map.map_id
             ),
             experiment=self.experiment,
         )
@@ -489,9 +533,9 @@ class ExperimentSession:
         return record
 
     def _apply_missing_metric_penalties(
-        self,
-        values: dict[str, float | None],
-        force_penalty: bool,
+            self,
+            values: dict[str, float | None],
+            force_penalty: bool,
     ) -> dict[str, float]:
         result: dict[str, float] = {}
         for specification in self.metric_specs:

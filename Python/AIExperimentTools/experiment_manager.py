@@ -90,7 +90,8 @@ class ExperimentManager:
         )
         try:
             final_map_ids = base_generator.start()
-            base_generator.mark_final_candidates(final_map_ids)
+            metadata["final_candidate_map_ids"] = list(final_map_ids)
+            self._write_evaluated_experiment(run_dir, experiment, metadata)
             copied_final_candidate_maps = base_generator.copy_final_candidate_maps(
                 final_map_ids
             )

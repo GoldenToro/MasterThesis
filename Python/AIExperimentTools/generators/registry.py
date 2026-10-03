@@ -52,6 +52,10 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "generators.map_elites.map_elites_generator",
         "run",
     ),
+    "template_hybrid": (
+        "generators.llm_map_creator.template_hybrid_generator",
+        "run",
+    ),
 }
 
 _ALIASES: dict[str, str] = {

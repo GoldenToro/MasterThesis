@@ -1,0 +1,61 @@
+{
+  "experiment_name": "template_hybrid_test",
+  "generator": "template_hybrid",
+  "generator_settings": {
+    "seed": 123,
+    "num_epochs": 1,
+    "max_time_seconds": 600,
+    "final_map_count": 3,
+    "template_count": 4,
+    "max_attempts_per_template": 2,
+    "maps_per_epoch": 6,
+    "template_rules_text": "Create a room with useful interior obstacles and multiple routes between its four doorways.",
+    "grok": {
+      "model": "grok-4.5",
+      "api_key": "xai-l0uVFvaQrSYluPsxn0OLaoMblcCGaLYtmQWdveeADgv9JyWgSxj2rq4Er99whPwegyvylrIMVxMpRqIC",
+      "base_url": "https://api.x.ai/v1",
+      "timeout_seconds": 240,
+      "max_output_tokens": 12000,
+      "reasoning_effort": "low",
+      "store": false
+    },
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "walkable_area_ratio",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      ]
+    }
+  },
+  "simulator_settings": {
+    "enabled": false
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": true,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "walkable_area_ratio",
+      "max_symmetry"
+    ]
+  }
+}

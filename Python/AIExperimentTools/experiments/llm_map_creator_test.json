@@ -14,7 +14,7 @@
     ],
     "grok": {
       "model": "grok-4.5",
-      "api_key": "xai-U19NdV878CPFTE7gVIdBczfdsBRVsGMzoiqWMJyE2NQ2bi0TD9QXr4gaOQYjy6pnlIQbJcDRJZCu6PlR",
+      "api_key": "xai-l0uVFvaQrSYluPsxn0OLaoMblcCGaLYtmQWdveeADgv9JyWgSxj2rq4Er99whPwegyvylrIMVxMpRqIC",
       "base_url": "https://api.x.ai/v1",
       "timeout_seconds": 240,
       "max_output_tokens": 12000,

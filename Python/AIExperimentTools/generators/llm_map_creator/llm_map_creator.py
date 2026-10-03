@@ -16,6 +16,7 @@ LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
 def run(base_generator: ExperimentSession) -> list[str]:
+    from openai import APIError
     """Generate maps with bounded corrective attempts and strict parsing."""
     settings = base_generator.generator_settings
     generic_placement = settings["map_completion"]["mode"] == "generic"
@@ -59,6 +60,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
     )
 
     generated_maps: list[CanonicalMap] = []
+    output_map_ids: list[str] = []
     generation_summary: list[dict[str, Any]] = []
 
     for map_index in range(map_count):
@@ -67,10 +69,19 @@ def run(base_generator: ExperimentSession) -> list[str]:
         last_map: CanonicalMap | None = None
         accepted_attempt = 0
         attempt_summaries: list[dict[str, Any]] = []
+        request_status = "attempts_exhausted"
 
         for attempt in range(1, maximum_attempts + 1):
+            if base_generator.production_time_expired():
+                request_status = (
+                    "deadline_reached" if attempt_summaries else "not_started"
+                )
+                break
+
+            provider_error = None
             response_result = None
             response_payload = None
+            canonical_map = None
 
             try:
                 response_result = creator.create_map(
@@ -91,7 +102,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 )
                 canonical_map = parse_response(
                     response_result.response,
-                    map_id=desired_map_id,
+                    map_id=f"{desired_map_id}_attempt_{attempt:02d}",
                     width=width,
                     height=height,
                     layout_only=generic_placement,
@@ -99,6 +110,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
                         "generator": "llm_map_creator",
                         "llm_provider": "xai",
                         "llm_model": response_result.model,
+                        "llm_request_id": desired_map_id,
                         "llm_response_id": response_result.response_id,
                         "llm_attempt": attempt,
                         "llm_usage": response_result.usage,
@@ -107,13 +119,28 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 )
 
                 last_map = canonical_map
+                generated_maps.append(canonical_map)
                 validation = validator.validate(canonical_map)
+            except APIError as exc:
+                provider_error = {
+                    "type": type(exc).__name__,
+                    "status_code": getattr(exc, "status_code", None),
+                }
+                validation = ValidationReport(
+                    valid=False,
+                    errors=[f"Provider request failed: {type(exc).__name__}"],
+                )
             except ValueError as exc:
                 validation = ValidationReport(
                     valid=False,
                     errors=[str(exc)],
                 )
-
+            attempt_status = (
+                "provider_error" if provider_error is not None
+                else "accepted" if validation.valid
+                else "invalid_layout" if canonical_map is not None
+                else "malformed_response"
+            )
             response_id = (
                 response_result.response_id
                 if response_result is not None
@@ -143,18 +170,26 @@ def run(base_generator: ExperimentSession) -> list[str]:
                     "validation_before_repair": validation.to_dict(),
                     "repair_actions": [],
                     "validation_after_repair": validation.to_dict(),
+                    "status": attempt_status,
+                    "provider_error": provider_error,
                 },
             )
             attempt_summaries.append({
                 "attempt": attempt,
                 "response_id": response_id,
+                "map_id": canonical_map.map_id if canonical_map is not None else None,
                 "valid": validation.valid,
                 "normalization_action_count": 0,
                 "repair_action_count": 0,
                 "errors": validation.errors,
             })
 
+            if provider_error is not None:
+                request_status = "provider_error"
+                break
+
             if validation.valid:
+                request_status = "accepted"
                 accepted_attempt = attempt
                 break
 
@@ -168,16 +203,19 @@ def run(base_generator: ExperimentSession) -> list[str]:
 
         valid_after_generation = accepted_attempt > 0
         generation_summary.append({
-            "map_id": desired_map_id,
+            "request_id": desired_map_id,
+            "map_id": last_map.map_id if last_map is not None else None,
             "accepted_attempt": accepted_attempt,
             "valid": valid_after_generation,
             "attempts": attempt_summaries,
+            "status": request_status,
         })
 
         if last_map is None:
             LOGGER.warning(
-                "Map request '%s' produced no well-formed grid after %s attempts.",
+                "Map request '%s': %s after %s attempts; no well-formed grid.",
                 desired_map_id,
+                request_status,
                 len(attempt_summaries),
             )
             continue
@@ -197,7 +235,8 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 "llm_attempt_count": len(attempt_summaries),
             },
         )
-        generated_maps.append(last_map)
+        generated_maps[-1] = last_map
+        output_map_ids.append(last_map.map_id)
 
     summary_path = base_generator.output_dir / "llm_map_generation.json"
     summary_path.write_text(
@@ -207,11 +246,15 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 "generator": "llm_map_creator",
                 "provider": "xai",
                 "map_count": map_count,
+                "generated_layout_count": len(generated_maps),
                 "width": width,
                 "height": height,
                 "rules_text": rules_text,
                 "examples_used": len(examples),
                 "maps": generation_summary,
+                "started_request_count": sum(
+                    bool(item["attempts"]) for item in generation_summary
+                ),
             },
             indent=2,
         ),
@@ -223,19 +266,17 @@ def run(base_generator: ExperimentSession) -> list[str]:
         len(generated_maps),
     )
     LOGGER.info(
-        "Created %s complete canonical maps with direct LLM output.",
+        "Recorded %s generated layouts from %s map requests.",
         len(generated_maps),
+        map_count,
     )
 
     candidates = [
         Candidate(canonical_map=item)
         for item in generated_maps
     ]
-    evaluated = base_generator.evaluate_candidates(candidates, epoch=0)
-    final_map_ids = [
-        candidate.map_id
-        for candidate in evaluated
-    ]
+    base_generator.evaluate_candidates(candidates, epoch=0)
+    final_map_ids = output_map_ids
 
     epoch_dir = base_generator.output_dir / "epoch_0000"
     epoch_dir.mkdir(parents=True, exist_ok=True)

@@ -55,6 +55,7 @@ class ExperimentSession:
         self.experiment_name = str(experiment["experiment_name"])
         self.generator_name = str(experiment["generator"])
         self.seed = int(experiment["seed"])
+        self.production_deadline = None
         self.results_csv = output_dir / "results.csv"
 
     @property
@@ -69,6 +70,11 @@ class ExperimentSession:
             for specification in self.metric_specs
         ]
 
+    def production_time_expired(self):
+        return (
+                self.production_deadline is not None
+                and monotonic() >= self.production_deadline
+        )
     def start(self) -> list[str]:
         """Control generation limits and select the final outputs."""
         settings = self.generator_settings
@@ -94,13 +100,13 @@ class ExperimentSession:
         if not isinstance(steps, Generator):
             raise TypeError("Generator run() must yield completed populations")
 
-        deadline = monotonic() + seconds if seconds > 0 else None
+        self.production_deadline = monotonic() + seconds if seconds > 0 else None
         population: list[str] = []
 
         try:
             # Initial generation, followed by at most num_epochs updates.
             for _ in range(num_epochs + 1):
-                if deadline is not None and monotonic() >= deadline:
+                if self.production_time_expired():
                     LOGGER.info("Generation time limit reached.")
                     break
 

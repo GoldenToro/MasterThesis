@@ -48,6 +48,10 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "generators.constructive.all_black_generator",
         "run",
     ),
+    "map_elites": (
+        "generators.map_elites.map_elites_generator",
+        "run",
+    ),
 }
 
 _ALIASES: dict[str, str] = {

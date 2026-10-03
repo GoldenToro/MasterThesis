@@ -361,7 +361,7 @@ class ExperimentAnalyzer:
                     epoch,
                     len(missing),
                 )
-            if population:
+            if epoch in checkpoint_ids:
                 source = "checkpoint_population"
             else:
                 population = evaluated

@@ -116,6 +116,7 @@ class ExperimentSession:
                     break
         finally:
             steps.close()
+            self.production_deadline = None
 
         final_map_ids = self._select_final_maps(population)
         self.mark_final_candidates(final_map_ids)
@@ -504,6 +505,7 @@ class ExperimentSession:
         requested = int(self.simulator_settings.get("simulations_per_map", 1))
         successful = 0
         failed = 0
+        skipped = 0
         failures: list[dict[str, Any]] = []
 
         simulator_enabled = bool(self.simulator_settings.get("enabled", True))
@@ -529,18 +531,26 @@ class ExperimentSession:
                 simulator_settings=self.simulator_settings,
                 epoch=epoch,
                 numeric_id=numeric_id,
+                production_deadline=self.production_deadline,
             )
             match_records = unity_result.match_records
             requested = unity_result.simulation_count_requested
             successful = unity_result.simulation_count_successful
             failed = unity_result.simulation_count_failed
+            skipped = unity_result.simulation_count_skipped
             failures = unity_result.failures
-            if failed == 0:
-                status = "completed"
-            elif successful > 0:
-                status = "partial_failure"
-            else:
+
+            if successful > 0:
+                if failed:
+                    status = "partial_failure"
+                elif skipped:
+                    status = "partial_evaluation"
+                else:
+                    status = "completed"
+            elif failed:
                 status = "failed"
+            else:
+                status = "budget_exhausted"
 
         metric_context = MetricContext(
             canonical_map=canonical_map,
@@ -566,7 +576,10 @@ class ExperimentSession:
         )
         metrics = self._apply_missing_metric_penalties(
             calculated,
-            force_penalty=(validation.valid is False or status == "failed"),
+            force_penalty=(
+                    validation.valid is False
+                    or status in {"failed", "budget_exhausted"}
+            ),
         )
         fitness_value = self._calculate_fitness(metrics)
 
@@ -581,6 +594,7 @@ class ExperimentSession:
             "simulations_requested": requested,
             "simulations_successful": successful,
             "simulations_failed": failed,
+            "simulations_skipped": skipped,
             "match_count": len(match_records),
             "metrics": metrics,
             "fitness_value": fitness_value,
@@ -655,6 +669,7 @@ class ExperimentSession:
             "simulations_requested",
             "simulations_successful",
             "simulations_failed",
+            "simulations_skipped",
             "match_count",
             *self.objective_names,
             "fitness_value",
@@ -672,6 +687,7 @@ class ExperimentSession:
                 "simulations_requested": record["simulations_requested"],
                 "simulations_successful": record["simulations_successful"],
                 "simulations_failed": record["simulations_failed"],
+                "simulations_skipped": record["simulations_skipped"],
                 "match_count": record["match_count"],
                 "fitness_value": record["fitness_value"],
                 "final_candidate": str(record["final_candidate"]).lower(),

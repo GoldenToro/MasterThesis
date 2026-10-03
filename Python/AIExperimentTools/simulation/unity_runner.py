@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
+from time import monotonic
 from map_schema.canonical_map import CanonicalMap
 
 
@@ -56,6 +56,7 @@ class UnityRunResult:
     simulation_count_successful: int
     simulation_count_failed: int
     failures: list[dict[str, Any]]
+    simulation_count_skipped: int = 0
 
 
 @dataclass
@@ -65,6 +66,7 @@ class _SingleUnityRunResult:
     simulation_index: int
     runtime_dir: Path
     error: str | None = None
+    skipped: bool = False
 
 
 class UnityRunner:
@@ -82,7 +84,25 @@ class UnityRunner:
         simulator_settings: dict[str, Any],
         epoch: int,
         numeric_id: int,
+        production_deadline: float | None = None,
     ) -> UnityRunResult:
+        simulation_count = int(
+            simulator_settings.get("simulations_per_map", 1)
+        )
+
+        if (
+            production_deadline is not None
+            and monotonic() >= production_deadline
+        ):
+            return UnityRunResult(
+                match_records=[],
+                simulation_count_requested=simulation_count,
+                simulation_count_successful=0,
+                simulation_count_failed=0,
+                failures=[],
+                simulation_count_skipped=simulation_count,
+            )
+
         unity_settings = self.settings["unity"]
         runner_directory = Path(
             str(unity_settings["EXPERIMENT_RUNNER_PATH"])
@@ -95,7 +115,6 @@ class UnityRunner:
                 f"Unity build is missing: {executable_path}. Update configs/settings.json."
             )
 
-        simulation_count = int(simulator_settings.get("simulations_per_map", 1))
         matches_per_simulation = int(
             simulator_settings.get("matches_per_simulation", 1)
         )
@@ -119,34 +138,53 @@ class UnityRunner:
                 executable_path=executable_path,
                 runner_directory=runner_directory,
                 unity_settings=unity_settings,
+                production_deadline=production_deadline,
             )
 
         if max_workers == 1:
-            single_results = [run_one(index) for index in range(simulation_count)]
+            single_results = [
+                run_one(index)
+                for index in range(simulation_count)
+            ]
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                single_results = list(executor.map(run_one, range(simulation_count)))
+                single_results = list(
+                    executor.map(run_one, range(simulation_count))
+                )
 
-        matches: list[dict[str, Any]] = []
-        failures: list[dict[str, Any]] = []
+        matches = []
+        failures = []
+        successful = 0
+        skipped = 0
+
         for result in single_results:
-            if result.successful:
+            if result.skipped:
+                skipped += 1
+            elif result.successful:
+                successful += 1
                 matches.extend(result.match_records)
             else:
-                failures.append(
-                    {
-                        "simulation_index": result.simulation_index,
-                        "error": result.error,
-                        "runtime_directory": str(result.runtime_dir.resolve()),
-                    }
-                )
+                failures.append({
+                    "simulation_index": result.simulation_index,
+                    "error": result.error,
+                    "runtime_directory": str(result.runtime_dir.resolve()),
+                })
+
+        if skipped:
+            LOGGER.info(
+                "Map %s: production deadline skipped %s of %s simulations.",
+                canonical_map.map_id,
+                skipped,
+                simulation_count,
+            )
 
         return UnityRunResult(
             match_records=matches,
             simulation_count_requested=simulation_count,
-            simulation_count_successful=simulation_count - len(failures),
+            simulation_count_successful=successful,
             simulation_count_failed=len(failures),
             failures=failures,
+            simulation_count_skipped=skipped,
         )
 
     def _run_single_simulation(
@@ -163,6 +201,7 @@ class UnityRunner:
         executable_path: Path,
         runner_directory: Path,
         unity_settings: dict[str, Any],
+        production_deadline: float | None = None,
     ) -> _SingleUnityRunResult:
         simulation_name = f"{canonical_map.map_id}_s{simulation_index:04d}"
         runtime_root = (
@@ -172,6 +211,17 @@ class UnityRunner:
             / canonical_map.map_id
             / f"simulation_{simulation_index:04d}"
         )
+        if (
+                production_deadline is not None
+                and monotonic() >= production_deadline
+        ):
+            return _SingleUnityRunResult(
+                successful=False,
+                match_records=[],
+                simulation_index=simulation_index,
+                runtime_dir=runtime_root,
+                skipped=True,
+            )
         bot_dir = runtime_root / "Bots"
         export_dir = runtime_root / "Export"
         bot_dir.mkdir(parents=True, exist_ok=True)
@@ -269,7 +319,17 @@ class UnityRunner:
                 )
             else:
                 command.append("-nolog")
-
+            if (
+                    production_deadline is not None
+                    and monotonic() >= production_deadline
+            ):
+                return _SingleUnityRunResult(
+                    successful=False,
+                    match_records=[],
+                    simulation_index=simulation_index,
+                    runtime_dir=runtime_root,
+                    skipped=True,
+                )
             LOGGER.info(
                 "    Map %s, simulation %s/%s: %s",
                 numeric_id,

@@ -425,6 +425,7 @@ class ExperimentAnalyzer:
             "simulations_requested",
             "simulations_successful",
             "simulations_failed",
+            "simulations_skipped",
             "match_count",
         ]
         metric_fields = list(dict.fromkeys(requested_map_metrics))

@@ -31,7 +31,7 @@ class SlidingArchive:
             )
 
         if not evaluation["valid"] or evaluation["status"] not in {
-            "completed", "partial_failure", "simulation_disabled"
+            "completed", "partial_failure", "partial_evaluation", "simulation_disabled"
         }:
             return
 

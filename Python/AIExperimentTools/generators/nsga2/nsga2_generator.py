@@ -206,6 +206,8 @@ def run(base_generator: ExperimentSession) -> list[str]:
             if not individual.fitness.valid
         ]
         evaluate_batch(pending, epoch)
+        if base_generator.production_time_expired():
+            return
         population = toolbox.select(population + offspring, population_size)
 
         if bool(settings.get("checkpoint_every_epoch", True)):

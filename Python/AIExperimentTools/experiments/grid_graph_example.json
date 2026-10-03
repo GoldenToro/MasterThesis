@@ -29,7 +29,10 @@
     "corridor_width": 2,
     "loop_probability": 0.25,
     "map_completion": {
-      "mode": "generator"
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
     }
   },
   "simulator_settings": {

@@ -5,8 +5,7 @@
     "population_size": 40,
     "map_width": 64,
     "map_height": 64,
-    "repair_enabled": true,
-    "repair_max_changed_cells": 8,
+    "repair_enabled": false,
     "copy_final_candidate_maps": true,
     "validation": {
       "minimum_spawn_count": 2,
@@ -23,11 +22,14 @@
       ]
     },
     "route_count_min": 2,
-    "route_count_max": 5,
+    "route_count_max": 3,
     "corridor_width_min": 1,
     "corridor_width_max": 3,
     "map_completion": {
-      "mode": "generator"
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
     }
   },
   "simulator_settings": {

@@ -86,7 +86,7 @@ def _generate(
         current = stack[-1]
         options = [
             neighbor
-            for neighbor in _neighbors(current, columns, rows)
+            for neighbor in sorted(_neighbors(current, columns, rows))
             if neighbor in occupied and neighbor not in visited
         ]
         if not options:

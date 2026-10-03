@@ -487,6 +487,7 @@ class ExperimentSession:
                 "repair": repair_report,
                 "validation_before_repair": validation_before.to_dict(),
                 "validation": validation.to_dict(),
+                "failed_simulations": failures,
             },
             raw_map_dir=(
                     self.output_dir

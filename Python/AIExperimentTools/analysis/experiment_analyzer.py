@@ -220,11 +220,11 @@ class ExperimentAnalyzer:
             raw_map_dir = self.run_dir / "_raw" / f"epoch_{epoch:04d}" / map_id
             context = MetricContext(
                 canonical_map=canonical_map,
-                match_records=self._load_match_records(raw_map_dir),
                 record=record,
                 raw_map_dir=raw_map_dir,
                 experiment=self.experiment,
             )
+            context.match_records = self._load_match_records(context)
             contexts.append(context)
         return contexts
 
@@ -301,23 +301,26 @@ class ExperimentAnalyzer:
         return None
 
     @staticmethod
-    def _load_match_records(raw_map_dir: Path) -> list[dict[str, Any]]:
+    def _load_match_records(
+            context: MetricContext,
+    ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
-        if raw_map_dir.is_dir() is False:
-            return records
-        for path in sorted(
-            raw_map_dir.glob("simulation_*/Export/final_results_*.json")
-        ):
+
+        for path in context.raw_files("final_results_*.json"):
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
+
             if isinstance(payload, dict):
                 records.append(dict(payload))
             elif isinstance(payload, list):
                 records.extend(
-                    dict(item) for item in payload if isinstance(item, dict)
+                    dict(item)
+                    for item in payload
+                    if isinstance(item, dict)
                 )
+
         return records
 
     def _rewrite_results_csv(

@@ -49,7 +49,19 @@ class MetricContext:
     def raw_files(self, pattern: str) -> list[Path]:
         if self.raw_map_dir is None or self.raw_map_dir.is_dir() is False:
             return []
-        return sorted(self.raw_map_dir.glob(f"simulation_*/Export/{pattern}"))
+
+        failed_directories = {
+            f"simulation_{failure['simulation_index']:04d}"
+            for failure in self.record.get("failed_simulations", [])
+        }
+
+        return sorted(
+            path
+            for path in self.raw_map_dir.glob(
+                f"simulation_*/Export/{pattern}"
+            )
+            if path.parent.parent.name not in failed_directories
+        )
 
     def positions(self, bot_index: int) -> list[tuple[float, float]]:
         key = f"positions_{bot_index}"

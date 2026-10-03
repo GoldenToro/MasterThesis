@@ -15,14 +15,39 @@ from map_schema.canonical_map import CanonicalMap
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
-def _read_final_results(path: Path) -> list[dict[str, Any]]:
+def _read_final_results(
+        path: Path,
+        expected_count: int,
+) -> list[dict[str, Any]]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(data, list):
-        return [dict(item) for item in data]
-    if isinstance(data, dict):
-        return [dict(data)]
-    raise ValueError(f"Unsupported Unity result format in {path}")
 
+    if isinstance(data, dict):
+        data = [data]
+
+    if (
+            not isinstance(data, list)
+            or not data
+            or len(data) != expected_count
+    ):
+        raise ValueError(
+            f"Expected {expected_count} Unity match results in {path}"
+        )
+
+    for match_index, record in enumerate(data):
+        if not isinstance(record, dict):
+            raise ValueError(
+                f"Invalid Unity result for match {match_index} in {path}"
+            )
+
+        for key in ("numberOfFrags1", "numberOfFrags2"):
+            value = record.get(key)
+            if type(value) is not int or value < 0:
+                raise ValueError(
+                    f"Missing or invalid {key} for match "
+                    f"{match_index} in {path}"
+                )
+
+    return data
 
 @dataclass
 class UnityRunResult:
@@ -269,7 +294,10 @@ class UnityRunner:
                     f"Unity result file is missing: {final_results}"
                 )
 
-            match_records = _read_final_results(final_results)
+            match_records = _read_final_results(
+                final_results,
+                matches_per_simulation,
+            )
             for match_index, record in enumerate(match_records):
                 record["simulation_index"] = simulation_index
                 record["match_index"] = match_index

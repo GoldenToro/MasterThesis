@@ -19,6 +19,7 @@ if __package__ in (None, ""):
 from analysis.experiment_analyzer import ExperimentAnalyzer
 from experiment_session import ExperimentSession
 
+
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
@@ -36,7 +37,13 @@ class ExperimentManager:
             return
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    def run_config(self, config_path: Path, dry_run: bool = False) -> Path:
+    def run_config(
+        self,
+        config_path: Path,
+        dry_run: bool = False,
+        *,
+        batch_dir: Path | None = None,
+    ) -> Path:
         source_experiment = self._load_json(config_path)
         experiment = copy.deepcopy(source_experiment)
         generator_settings = experiment.setdefault("generator_settings", {})
@@ -50,14 +57,18 @@ class ExperimentManager:
 
         self._validate_experiment(experiment, config_path)
         started_at = datetime.now().astimezone()
+
+        if batch_dir is None:
+            batch_dir = self._create_batch_directory(started_at)
+
         run_dir = self._create_run_directory(
             str(experiment["experiment_name"]),
-            started_at,
+            batch_dir,
         )
         (run_dir / "_raw").mkdir(parents=True, exist_ok=True)
 
-        # Keep the submitted experiment file unchanged. The resolved seed and run
-        # information are stored separately in experiment_evaluated.json.
+        # Keep the submitted configuration unchanged.
+        # Resolved settings and run information are saved separately.
         shutil.copy2(config_path, run_dir / "experiment.json")
 
         metadata: dict[str, Any] = {
@@ -143,14 +154,31 @@ class ExperimentManager:
             traceback.print_exc()
             raise
 
-    def run_all(self, dry_run: bool = False) -> list[Path]:
-        experiments_root = self._resolve_setting_path("experiments_root")
-        configs = sorted(experiments_root.glob("*.json"))
-        if len(configs) == 0:
-            raise FileNotFoundError(
-                f"No experiment JSON files found in {experiments_root}"
+    def run_all(
+        self,
+        dry_run: bool = False,
+        *,
+        directory: Path | None = None,
+    ) -> list[Path]:
+        if directory is None:
+            directory = self._resolve_setting_path("experiments_root")
+
+        if not directory.is_dir():
+            raise NotADirectoryError(
+                f"Experiment folder does not exist: {directory}"
             )
 
+        configs = sorted(
+            path for path in directory.glob("*.json") if path.is_file()
+        )
+        if not configs:
+            raise FileNotFoundError(
+                f"No experiment JSON files found in {directory}"
+            )
+
+        batch_dir = self._create_batch_directory(
+            datetime.now().astimezone()
+        )
         results: list[Path] = []
         continue_on_error = bool(
             self.settings.get("execution", {}).get(
@@ -160,10 +188,15 @@ class ExperimentManager:
         )
         for path in configs:
             try:
-                results.append(self.run_config(path, dry_run=dry_run))
+                results.append(self.run_config(
+                    path,
+                    dry_run=dry_run,
+                    batch_dir=batch_dir,
+                ))
             except Exception:
-                if continue_on_error is False:
+                if not continue_on_error:
                     raise
+
         return results
 
     def _validate_experiment(
@@ -297,6 +330,7 @@ class ExperimentManager:
                 )
             if int(simulator["game_length"]) <= 0:
                 raise ValueError("game_length must be positive")
+
             for bot_name in ("bot1", "bot2"):
                 if {"file", "skill"}.issubset(simulator[bot_name]) is False:
                     raise ValueError(f"{bot_name} requires file and skill")
@@ -327,24 +361,41 @@ class ExperimentManager:
             return secrets.randbelow(2 ** 31 - 1) + 1
         return int(value)
 
+    def _create_batch_directory(self, started_at: datetime) -> Path:
+        results_root = self._resolve_setting_path("results_root")
+        timestamp = started_at.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = 0
+
+        while True:
+            name = timestamp if suffix == 0 else f"{timestamp}_{suffix:02d}"
+            batch_dir = results_root / name
+            try:
+                batch_dir.mkdir(parents=True)
+            except FileExistsError:
+                suffix += 1
+            else:
+                return batch_dir
+
     def _create_run_directory(
             self,
             experiment_name: str,
-            started_at: datetime,
+            batch_dir: Path,
     ) -> Path:
         safe_name = "".join(
             character if character.isalnum() or character in "-_" else "_"
             for character in experiment_name
-        )
-        timestamp = started_at.strftime("%Y-%m-%d_%H-%M-%S")
-        results_root = self._resolve_setting_path("results_root")
-        run_dir = results_root / safe_name / timestamp
-        suffix = 1
-        while run_dir.exists():
-            run_dir = results_root / safe_name / f"{timestamp}_{suffix:02d}"
-            suffix += 1
-        run_dir.mkdir(parents=True)
-        return run_dir
+        ) or "experiment"
+        suffix = 0
+
+        while True:
+            name = safe_name if suffix == 0 else f"{safe_name}_{suffix:02d}"
+            run_dir = batch_dir / name
+            try:
+                run_dir.mkdir(parents=True)
+            except FileExistsError:
+                suffix += 1
+            else:
+                return run_dir
 
     def _resolve_setting_path(self, key: str) -> Path:
         path = Path(self.settings["paths"][key])
@@ -372,7 +423,21 @@ class ExperimentManager:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run FPS PCG experiments")
-    parser.add_argument("-c", "--config", type=Path, help="Run one experiment JSON")
+    parser.add_argument(
+        "target",
+        nargs="?",
+        type=Path,
+        help=(
+            "Experiment JSON file or folder; names also resolve "
+            "under experiments_root"
+        ),
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        help="Alternative way to specify the experiment JSON file or folder",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -380,16 +445,40 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if args.target is not None and args.config is not None:
+        parser.error("Use either a positional target or --config, not both.")
+
     manager = ExperimentManager()
-    if args.config:
-        config_path = args.config
-        if config_path.is_absolute() is False:
-            config_path = (Path.cwd() / config_path).resolve()
-        output = manager.run_config(config_path, dry_run=args.dry_run)
-        LOGGER.info("Experiment completed: %s", output)
+    target = args.target if args.target is not None else args.config
+
+    if target is None:
+        outputs = manager.run_all(dry_run=args.dry_run)
     else:
-        for output in manager.run_all(dry_run=args.dry_run):
-            LOGGER.info("Experiment completed: %s", output)
+        target = target.expanduser()
+        if not target.is_absolute():
+            local_path = Path.cwd() / target
+            if local_path.exists():
+                target = local_path
+            else:
+                target = (
+                        manager._resolve_setting_path("experiments_root") / target
+                )
+        target = target.resolve()
+
+        if target.is_dir():
+            outputs = manager.run_all(
+                dry_run=args.dry_run,
+                directory=target,
+            )
+        elif target.is_file() and target.suffix.lower() == ".json":
+            outputs = [manager.run_config(target, dry_run=args.dry_run)]
+        else:
+            parser.error(
+                f"Expected an existing JSON file or folder: {target}"
+            )
+
+    for output in outputs:
+        LOGGER.info("Experiment completed: %s", output)
     return 0
 
 

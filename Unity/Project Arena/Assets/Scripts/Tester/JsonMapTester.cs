@@ -128,6 +128,7 @@ namespace Tester
             var bot2 = LoadBot(configuration.bot2);
 
             manager = gameObject.AddComponent<GenomeTesterGameManager>();
+            manager.SetInitialSpawnAssignment(experimentNumber % 2 != 0);
             manager.SetParameters(
                 botPrefab,
                 configuration.bot1.id,
@@ -198,7 +199,10 @@ namespace Tester
 
             manager.StopGame();
             Destroy(manager);
-            results.Add(analyzer.CompileResults(configuration.gameLength));
+            var result = analyzer.CompileResults(configuration.gameLength);
+            result["initial_spawn_index_bot1"] = manager.InitialSpawnIndexBot1;
+            result["initial_spawn_index_bot2"] = manager.InitialSpawnIndexBot2;
+            results.Add(result);
             experimentNumber++;
 
             if (experimentNumber >= configuration.numExperiments)

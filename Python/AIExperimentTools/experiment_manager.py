@@ -290,8 +290,11 @@ class ExperimentManager:
                 )
             if int(simulator["simulations_per_map"]) <= 0:
                 raise ValueError("simulations_per_map must be positive")
-            if int(simulator["matches_per_simulation"]) <= 0:
-                raise ValueError("matches_per_simulation must be positive")
+            if int(simulator["matches_per_simulation"]) != 2:
+                raise ValueError(
+                    "matches_per_simulation must be 2: "
+                    "one match for each initial spawn assignment"
+                )
             if int(simulator["game_length"]) <= 0:
                 raise ValueError("game_length must be positive")
             for bot_name in ("bot1", "bot2"):

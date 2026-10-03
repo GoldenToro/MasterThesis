@@ -31,6 +31,15 @@ namespace Managers.Mode
 
         private int playerKillCount;
 
+        public int InitialSpawnIndexBot1 { get; private set; } = -1;
+        public int InitialSpawnIndexBot2 { get; private set; } = -1;
+
+        public void SetInitialSpawnAssignment(bool reverse)
+        {
+            InitialSpawnIndexBot1 = reverse ? 1 : 0;
+            InitialSpawnIndexBot2 = reverse ? 0 : 1;
+        }
+
         private void Awake()
         {
             if (generateOnly) throw new ArgumentException("Generate only is unsupported!");
@@ -48,9 +57,19 @@ namespace Managers.Mode
                 // Set the spawn points.
                 spawnPointManagerScript.SetSpawnPoints(mapManagerScript.GetSpawnPoints());
 
-                // Spawn the player and the opponent.
-                Spawn(bot1);
-                Spawn(bot2);
+                // Spawn the bots at their assigned initial positions.
+                if (InitialSpawnIndexBot1 >= 0)
+                {
+                    bot1.transform.position =
+                        spawnPointManagerScript.GetAssignedSpawnPosition(InitialSpawnIndexBot1);
+                    bot2.transform.position =
+                        spawnPointManagerScript.GetAssignedSpawnPosition(InitialSpawnIndexBot2);
+                }
+                else
+                {
+                    Spawn(bot1);
+                    Spawn(bot2);
+                }
 
                 ai1.SetCharacteristics(bot1Params);
                 ai1.SetEnemy(ai2);

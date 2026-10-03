@@ -19,6 +19,11 @@ def _read_final_results(
         path: Path,
         expected_count: int,
 ) -> list[dict[str, Any]]:
+    if expected_count != 2:
+        raise ValueError(
+            "A Unity simulation must contain exactly two assignment matches."
+        )
+
     data = json.loads(path.read_text(encoding="utf-8"))
 
     if isinstance(data, dict):
@@ -45,6 +50,17 @@ def _read_final_results(
                 raise ValueError(
                     f"Missing or invalid {key} for match "
                     f"{match_index} in {path}"
+                )
+
+        for key, expected in (
+            ("initial_spawn_index_bot1", match_index),
+            ("initial_spawn_index_bot2", 1 - match_index),
+        ):
+            value = record.get(key)
+            if type(value) is not int or value != expected:
+                raise ValueError(
+                    f"Missing or incorrect {key} for match {match_index} in {path}. "
+                    "Expected a complete pair from the updated Unity build."
                 )
 
     return data
@@ -116,8 +132,13 @@ class UnityRunner:
             )
 
         matches_per_simulation = int(
-            simulator_settings.get("matches_per_simulation", 1)
+            simulator_settings.get("matches_per_simulation", 2)
         )
+        if matches_per_simulation != 2:
+            raise ValueError(
+                "matches_per_simulation must be 2: "
+                "one match for each initial spawn assignment"
+            )
         execution = self.settings.get("execution", {})
         configured_workers = int(
             execution.get("max_parallel_simulations_per_map", 1)

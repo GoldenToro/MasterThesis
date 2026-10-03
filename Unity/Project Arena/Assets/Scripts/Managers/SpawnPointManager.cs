@@ -62,6 +62,18 @@ namespace Managers
             return GetRandomSpawnPoint(availableSpawnPoints).spawnPosition;
         }
 
+        public Vector3 GetAssignedSpawnPosition(int index)
+        {
+            if (spawnPoints == null || index < 0 || index >= spawnPoints.Count)
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(index), "Assigned spawn is missing."
+                );
+
+            var spawnPoint = spawnPoints[index];
+            spawnPoint.lastUsed = Time.time;
+            lastUsed = spawnPoint;
+            return spawnPoint.spawnPosition;
+        }
         // Returns a random spawn point from a list.
         private SpawnPoint GetRandomSpawnPoint(List<SpawnPoint> SPs)
         {

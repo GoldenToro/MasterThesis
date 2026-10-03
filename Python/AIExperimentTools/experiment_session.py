@@ -569,19 +569,19 @@ class ExperimentSession:
             ),
             experiment=self.experiment,
         )
-        calculated = calculate_metrics(
+        metrics = calculate_metrics(
             match_records,
             self.objective_names,
             metric_context,
         )
-        metrics = self._apply_missing_metric_penalties(
-            calculated,
+        fitness_metrics = self._apply_missing_metric_penalties(
+            metrics,
             force_penalty=(
                     validation.valid is False
                     or status in {"failed", "budget_exhausted"}
             ),
         )
-        fitness_value = self._calculate_fitness(metrics)
+        fitness_value = self._calculate_fitness(fitness_metrics)
 
         record = {
             "experiment": self.experiment_name,
@@ -597,6 +597,7 @@ class ExperimentSession:
             "simulations_skipped": skipped,
             "match_count": len(match_records),
             "metrics": metrics,
+            "fitness_metrics": fitness_metrics,
             "fitness_value": fitness_value,
             "final_candidate": False,
             "validation_before_repair": validation_before.to_dict(),
@@ -728,7 +729,11 @@ class ExperimentSession:
                 record["valid"],
                 record["status"],
             ]
-            row.extend(record["metrics"][name] for name in self.objective_names)
+            row.extend(
+                float("nan") if record["metrics"][name] is None
+                else record["metrics"][name]
+                for name in self.objective_names
+            )
             row.append(record["fitness_value"])
             values.append(tuple(row))
         return np.array(values, dtype=dtype)

@@ -166,7 +166,7 @@ def run(base_generator: ExperimentSession) -> list[str]:
                     f"Candidate '{candidate.map_id}' has no evaluation"
                 )
 
-            metrics = candidate.evaluation["metrics"]
+            metrics = candidate.evaluation["fitness_metrics"]
             candidate.genome.fitness.values = tuple(
                 float(metrics[name])
                 for name in objective_names
@@ -185,6 +185,8 @@ def run(base_generator: ExperimentSession) -> list[str]:
     epoch = 1
 
     while True:
+        if base_generator.production_time_expired():
+            return
         offspring = tools.selTournamentDCD(population, len(population))
         offspring = [toolbox.clone(individual) for individual in offspring]
 
@@ -206,8 +208,6 @@ def run(base_generator: ExperimentSession) -> list[str]:
             if not individual.fitness.valid
         ]
         evaluate_batch(pending, epoch)
-        if base_generator.production_time_expired():
-            return
         population = toolbox.select(population + offspring, population_size)
 
         if bool(settings.get("checkpoint_every_epoch", True)):

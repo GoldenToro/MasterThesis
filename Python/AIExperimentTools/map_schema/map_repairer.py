@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from collections import deque
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from map_schema.canonical_map import ALLOWED_SYMBOLS, FLOOR, SPAWN, WALL, WALKABLE_SYMBOLS, CanonicalMap
+from map_schema.canonical_map import (
+    ALLOWED_SYMBOLS,
+    FLOOR,
+    WALL,
+    CanonicalMap,
+)
+from map_schema.map_validator import MapValidator
 
 
 @dataclass
@@ -17,127 +22,94 @@ class RepairReport:
 
 
 class MapRepairer:
-    """Deterministic, intentionally conservative repairs for generated grids."""
+    """Connect walkable regions within an explicit changed-cell limit."""
 
     def repair(
-        self,
-        canonical_map: CanonicalMap,
-        minimum_spawn_count: int = 2,
+            self,
+            canonical_map: CanonicalMap,
+            *,
+            max_changed_cells: int,
     ) -> tuple[CanonicalMap, RepairReport]:
-        grid = [list(row) for row in canonical_map.grid]
-        actions: list[str] = []
+        if type(max_changed_cells) is not int or max_changed_cells <= 0:
+            raise ValueError("max_changed_cells must be a positive integer")
 
-        replacements = 0
-        for y, row in enumerate(grid):
-            for x, symbol in enumerate(row):
-                if symbol not in ALLOWED_SYMBOLS:
-                    grid[y][x] = WALL
-                    replacements += 1
-        if replacements:
-            actions.append(f"Replaced {replacements} unsupported symbols with walls")
-
-        components = self._components(grid)
-        while len(components) > 1:
-            first = components[0]
-            second = min(
-                components[1:],
-                key=lambda component: self._component_distance(first, component),
+        unsupported = sorted({
+            symbol
+            for _, _, symbol in canonical_map.iter_cells()
+            if symbol not in ALLOWED_SYMBOLS
+        })
+        if unsupported:
+            raise ValueError(
+                f"Repair does not replace unsupported symbols: {unsupported}"
             )
-            start, end = self._closest_pair(first, second)
-            self._carve_manhattan(grid, start, end)
-            actions.append(f"Connected regions from {start} to {end}")
-            components = self._components(grid)
 
-        spawns = self._cells(grid, {SPAWN})
-        walkable = self._cells(grid, WALKABLE_SYMBOLS)
-        while len(spawns) < minimum_spawn_count and walkable:
-            candidate = self._farthest_cell(walkable, spawns)
-            grid[candidate[1]][candidate[0]] = SPAWN
-            spawns.append(candidate)
-            actions.append(f"Added spawn marker at {candidate}")
+        grid = [list(row) for row in canonical_map.grid]
+        walkable = set(canonical_map.walkable_cells())
+        components = MapValidator._components(
+            walkable,
+            canonical_map.width,
+            canonical_map.height,
+        )
+        actions: list[str] = []
+        changed_cells = 0
+
+        while len(components) > 1:
+            first = min(components, key=lambda component: min(component))
+            others = walkable - first
+
+            start, end = min(
+                ((a, b) for a in first for b in others),
+                key=lambda pair: (
+                    abs(pair[0][0] - pair[1][0])
+                    + abs(pair[0][1] - pair[1][1]),
+                    pair,
+                ),
+            )
+
+            path = [
+                (x, start[1])
+                for x in range(
+                    min(start[0], end[0]),
+                    max(start[0], end[0]) + 1,
+                    )
+            ]
+            path.extend(
+                (end[0], y)
+                for y in range(
+                    min(start[1], end[1]),
+                    max(start[1], end[1]) + 1,
+                    )
+            )
+            walls = {
+                (x, y)
+                for x, y in path
+                if grid[y][x] == WALL
+            }
+
+            required_changes = changed_cells + len(walls)
+            if required_changes > max_changed_cells:
+                raise ValueError(
+                    "Connecting the regions would exceed "
+                    f"the repair limit of {max_changed_cells} changed cells"
+                )
+
+            for x, y in walls:
+                grid[y][x] = FLOOR
+
+            changed_cells = required_changes
+            walkable.update(walls)
+            actions.append(f"Connected regions from {start} to {end}")
+            components = MapValidator._components(
+                walkable,
+                canonical_map.width,
+                canonical_map.height,
+            )
+
+        if not actions:
+            return canonical_map, RepairReport(changed=False)
 
         repaired = canonical_map.replace_grid(
             ("".join(row) for row in grid),
             {"repair_actions": actions},
         )
-        return repaired, RepairReport(changed=bool(actions), actions=actions)
-
-    @staticmethod
-    def _cells(grid: list[list[str]], symbols) -> list[tuple[int, int]]:
-        accepted = set(symbols)
-        return [
-            (x, y)
-            for y, row in enumerate(grid)
-            for x, value in enumerate(row)
-            if value in accepted
-        ]
-
-    @classmethod
-    def _components(cls, grid: list[list[str]]) -> list[set[tuple[int, int]]]:
-        height = len(grid)
-        width = len(grid[0])
-        remaining = set(cls._cells(grid, WALKABLE_SYMBOLS))
-        components: list[set[tuple[int, int]]] = []
-        while remaining:
-            start = next(iter(remaining))
-            queue = deque([start])
-            component = {start}
-            remaining.remove(start)
-            while queue:
-                x, y = queue.popleft()
-                for neighbor in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-                    nx, ny = neighbor
-                    if 0 <= nx < width and 0 <= ny < height and neighbor in remaining:
-                        remaining.remove(neighbor)
-                        component.add(neighbor)
-                        queue.append(neighbor)
-            components.append(component)
-        return components
-
-    @staticmethod
-    def _component_distance(
-        first: set[tuple[int, int]], second: set[tuple[int, int]]
-    ) -> int:
-        return min(abs(ax - bx) + abs(ay - by) for ax, ay in first for bx, by in second)
-
-    @staticmethod
-    def _closest_pair(
-        first: set[tuple[int, int]], second: set[tuple[int, int]]
-    ) -> tuple[tuple[int, int], tuple[int, int]]:
-        return min(
-            ((a, b) for a in first for b in second),
-            key=lambda pair: abs(pair[0][0] - pair[1][0]) + abs(pair[0][1] - pair[1][1]),
-        )
-
-    @staticmethod
-    def _carve_manhattan(
-        grid: list[list[str]], start: tuple[int, int], end: tuple[int, int]
-    ) -> None:
-        x, y = start
-        end_x, end_y = end
-        step_x = 1 if end_x >= x else -1
-        while x != end_x:
-            if grid[y][x] == WALL:
-                grid[y][x] = FLOOR
-            x += step_x
-        step_y = 1 if end_y >= y else -1
-        while y != end_y:
-            if grid[y][x] == WALL:
-                grid[y][x] = FLOOR
-            y += step_y
-        if grid[y][x] == WALL:
-            grid[y][x] = FLOOR
-
-    @staticmethod
-    def _farthest_cell(
-        candidates: list[tuple[int, int]], selected: list[tuple[int, int]]
-    ) -> tuple[int, int]:
-        if selected:
-            return max(
-                candidates,
-                key=lambda candidate: min(
-                    abs(candidate[0] - point[0]) + abs(candidate[1] - point[1])
-                    for point in selected
-                ),
-            )
-        return candidates[len(candidates) // 2]
+        return repaired, RepairReport(changed=True, actions=actions)

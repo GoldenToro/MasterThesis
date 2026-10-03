@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import logging
+import math
 import secrets
 import shutil
 import sys
@@ -17,7 +18,6 @@ if __package__ in (None, ""):
 
 from analysis.experiment_analyzer import ExperimentAnalyzer
 from experiment_session import ExperimentSession
-
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
@@ -39,6 +39,11 @@ class ExperimentManager:
     def run_config(self, config_path: Path, dry_run: bool = False) -> Path:
         source_experiment = self._load_json(config_path)
         experiment = copy.deepcopy(source_experiment)
+        generator_settings = experiment.setdefault("generator_settings", {})
+        generator_settings.setdefault(
+            "map_scale",
+            self.settings.get("unity", {}).get("map_scale", 2.0),
+        )
         experiment["seed"] = self._resolve_seed(experiment.get("generator_settings", {}).get("seed"))
         if dry_run:
             experiment.setdefault("simulator_settings", {})["enabled"] = False
@@ -159,9 +164,9 @@ class ExperimentManager:
         return results
 
     def _validate_experiment(
-        self,
-        experiment: dict[str, Any],
-        path: Path,
+            self,
+            experiment: dict[str, Any],
+            path: Path,
     ) -> None:
         required = {
             "experiment_name",
@@ -175,6 +180,39 @@ class ExperimentManager:
             raise ValueError(f"Experiment {path} is missing fields: {missing}")
 
         generator = experiment["generator_settings"]
+        width = generator.get("map_width")
+        height = generator.get("map_height")
+        if (width is None) != (height is None):
+            raise ValueError("Provide map_width and map_height together")
+        if width is not None and (
+                type(width) is not int
+                or type(height) is not int
+                or width <= 0
+                or height <= 0
+        ):
+            raise ValueError("map_width and map_height must be positive integers")
+
+        scale = generator.get("map_scale")
+        if (
+                isinstance(scale, bool)
+                or not isinstance(scale, (int, float))
+                or not math.isfinite(scale)
+                or scale <= 0
+        ):
+            raise ValueError(
+                "generator_settings.map_scale must be positive and finite"
+            )
+
+        repair_enabled = generator.get("repair_enabled", False)
+        if type(repair_enabled) is not bool:
+            raise ValueError("repair_enabled must be true or false")
+        if repair_enabled:
+            repair_limit = generator.get("repair_max_changed_cells")
+            if type(repair_limit) is not int or repair_limit <= 0:
+                raise ValueError(
+                    "Enabled repair requires a positive integer "
+                    "repair_max_changed_cells"
+                )
         completion = generator.get("map_completion")
         if not isinstance(completion, dict):
             raise ValueError("generator_settings.map_completion is required")
@@ -280,13 +318,13 @@ class ExperimentManager:
     @staticmethod
     def _resolve_seed(value: Any) -> int:
         if value is None or str(value).strip() in {"", "-1"}:
-            return secrets.randbelow(2**31 - 1) + 1
+            return secrets.randbelow(2 ** 31 - 1) + 1
         return int(value)
 
     def _create_run_directory(
-        self,
-        experiment_name: str,
-        started_at: datetime,
+            self,
+            experiment_name: str,
+            started_at: datetime,
     ) -> Path:
         safe_name = "".join(
             character if character.isalnum() or character in "-_" else "_"
@@ -315,9 +353,9 @@ class ExperimentManager:
 
     @staticmethod
     def _write_evaluated_experiment(
-        run_dir: Path,
-        experiment: dict[str, Any],
-        metadata: dict[str, Any],
+            run_dir: Path,
+            experiment: dict[str, Any],
+            metadata: dict[str, Any],
     ) -> None:
         payload = {**experiment, "run_metadata": metadata}
         (run_dir / "experiment_evaluated.json").write_text(

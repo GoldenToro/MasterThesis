@@ -102,7 +102,7 @@ class GrokMapCreator:
 
         parsed = getattr(api_response, "output_parsed", None)
         if parsed is None:
-            raise RuntimeError("Grok returned an empty parsed map response")
+            raise ValueError("Grok returned an empty parsed map response")
         if isinstance(parsed, DirectCanonicalMapResponse) is False:
             parsed = DirectCanonicalMapResponse.model_validate(parsed)
 
@@ -113,7 +113,6 @@ class GrokMapCreator:
             model=self.model,
         )
 
-    @staticmethod
     def _system_prompt(self) -> str:
         if self.layout_only:
             return (

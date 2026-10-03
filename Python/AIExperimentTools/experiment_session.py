@@ -145,6 +145,7 @@ class ExperimentSession:
             metadata["epoch"] = int(epoch)
             metadata["id"] = int(numeric_id)
             metadata.setdefault("generator", self.generator_name)
+            metadata["map_scale"] = float(self.generator_settings["map_scale"])
 
             normalized_map = replace(canonical_map, metadata=metadata)
             save_canonical_map(
@@ -316,24 +317,52 @@ class ExperimentSession:
         generic_placement = completion["mode"] == "generic"
 
         validation_settings = dict(generation.get("validation", {}))
+        validation_settings["expected_width"] = generation.get("map_width")
+        validation_settings["expected_height"] = generation.get("map_height")
         validation_settings["minimum_spawn_count"] = max(
             2, int(validation_settings.get("minimum_spawn_count", 2))
         )
-        layout_settings = {**validation_settings, "minimum_spawn_count": 0}
+
+        layout_settings = {
+            **validation_settings,
+            "minimum_spawn_count": 0,
+        }
         layout_validator = MapValidator(layout_settings)
 
         if generic_placement:
             canonical_map = strip_objects(canonical_map)
 
         validation_before = layout_validator.validate(canonical_map)
-        repair_report: dict[str, Any] = {"changed": False, "actions": []}
+        repair_report: dict[str, Any] = {
+            "changed": False,
+            "actions": [],
+        }
+        repair_error = None
 
-        if not validation_before.valid and generation.get("repair_enabled", False):
-            canonical_map, repair = MapRepairer().repair(
-                canonical_map,
-                minimum_spawn_count=0,
-            )
-            repair_report = repair.to_dict()
+        dimensions_match = (
+            validation_settings["expected_width"]
+            in (None, canonical_map.width)
+            and validation_settings["expected_height"]
+            in (None, canonical_map.height)
+        )
+        needs_connection = (
+            bool(layout_settings.get("require_single_connected_region", True))
+            and validation_before.measured["connected_components"] > 1
+        )
+
+        if (
+            generation.get("repair_enabled", False)
+            and dimensions_match
+            and needs_connection
+        ):
+            try:
+                canonical_map, repair = MapRepairer().repair(
+                    canonical_map,
+                    max_changed_cells=generation["repair_max_changed_cells"],
+                )
+                repair_report = repair.to_dict()
+            except ValueError as exc:
+                repair_error = str(exc)
 
         completion_error = None
         if generic_placement and layout_validator.validate(canonical_map).valid:
@@ -348,14 +377,21 @@ class ExperimentSession:
                 completion_error = str(exc)
 
         validation = MapValidator(validation_settings).validate(canonical_map)
+
+        if repair_error is not None:
+            validation.valid = False
+            validation.errors.append(f"Repair rejected: {repair_error}")
+
         if completion_error is not None:
             validation.valid = False
-            validation.errors.append(f"Map completion failed: {completion_error}")
+            validation.errors.append(
+                f"Map completion failed: {completion_error}"
+            )
 
         save_canonical_map(
             canonical_map,
             epoch_dir / f"{canonical_map.map_id}.map.json",
-            )
+        )
 
         epoch, numeric_id = self._map_sort_key(canonical_map)
         match_records: list[dict[str, Any]] = []

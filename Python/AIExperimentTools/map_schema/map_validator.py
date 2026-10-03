@@ -25,6 +25,13 @@ class MapValidator:
     def validate(self, canonical_map: CanonicalMap) -> ValidationReport:
         errors: list[str] = []
         warnings: list[str] = []
+        for name in ("width", "height"):
+            expected = self.settings.get(f"expected_{name}")
+            actual = getattr(canonical_map, name)
+            if expected is not None and actual != expected:
+                errors.append(
+                    f"Map {name} is {actual}, expected {expected}"
+                )
 
         invalid_symbols = sorted(
             {symbol for _, _, symbol in canonical_map.iter_cells() if symbol not in ALLOWED_SYMBOLS}

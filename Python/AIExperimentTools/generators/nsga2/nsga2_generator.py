@@ -22,12 +22,30 @@ def run(base_generator: ExperimentSession) -> list[str]:
             "'python -m pip install -r requirements.txt'."
         ) from exc
 
-    from generators.nsga2.internals.ab_genome.ab_genome import ABGenome
+    from generators.nsga2.internals.ab_genome.ab_genome import (
+        ABGenome,
+        AB_MAX_MAP_WIDTH,
+        AB_MAX_MAP_HEIGHT,
+        AB_SQUARE_SIZE,
+    )
     from generators.nsga2.internals.ab_genome.crossover import crossover
     from generators.nsga2.internals.ab_genome.generation import create_random_genome
     from generators.nsga2.internals.ab_genome.mutation import mutate
 
     settings = base_generator.generator_settings
+    supported_size = (
+        AB_MAX_MAP_WIDTH * AB_SQUARE_SIZE,
+        AB_MAX_MAP_HEIGHT * AB_SQUARE_SIZE,
+    )
+    configured_size = (
+        settings.get("map_width", supported_size[0]),
+        settings.get("map_height", supported_size[1]),
+    )
+    if configured_size != supported_size:
+        raise ValueError(
+            "The current NSGA-II genome only supports "
+            f"{supported_size[0]}x{supported_size[1]} maps"
+        )
     population_size = int(settings["population_size"])
     num_epochs = int(settings["num_epochs"])
     if population_size < 4 or population_size % 4 != 0:

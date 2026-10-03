@@ -254,7 +254,11 @@ namespace Tester
                 if (compiled[key] is float value &&
                     (float.IsNaN(value) || float.IsInfinity(value)))
                 {
-                    compiled[key]
+                    compiled[key] = null;
+                }
+            }
+
+            return compiled;
         }
     }
 }

@@ -320,7 +320,7 @@ namespace Maps.MapAssembler
         public override void ClearMap()
         {
             topMeshFilter.mesh.Clear();
-            if (hasCeiling) topCollider.sharedMesh.Clear();
+            if (hasCeiling && topCollider.sharedMesh != null) topCollider.sharedMesh.Clear();
             floorMeshFilter.mesh.Clear();
             floorCollider.sharedMesh.Clear();
             foreach(Transform child in walls.transform)

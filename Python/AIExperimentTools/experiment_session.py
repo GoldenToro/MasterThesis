@@ -389,6 +389,7 @@ class ExperimentSession:
             if record.get("status") not in {
                 "completed",
                 "partial_failure",
+                "partial_evaluation",
                 "simulation_disabled",
             }:
                 continue

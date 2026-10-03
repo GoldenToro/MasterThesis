@@ -71,6 +71,10 @@ namespace Managers.Mode
                     Spawn(bot2);
                 }
 
+                Debug.Log(
+                    $"Initial spawn positions: bot {bot1ID} = {bot1.transform.position}; " +
+                    $"bot {bot2ID} = {bot2.transform.position}"
+                );
                 ai1.SetCharacteristics(bot1Params);
                 ai1.SetEnemy(ai2);
                 ai1.SetupEntity(TOTAL_HEALTH_BOT, activeGunsBot1, this, bot1ID);

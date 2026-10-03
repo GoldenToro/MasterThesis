@@ -2,7 +2,6 @@
   "experiment_name": "all_black",
   "generator": "all_black",
   "generator_settings": {
-    "only_keep_result_summary": false,
     "population_size": 40,
     "map_width": 64,
     "map_height": 64,
@@ -59,6 +58,7 @@
     "calculate_all_metrics": false,
     "calculate_metric": [],
     "create_diagram_fitness": true,
+    "only_keep_result_summary": false,
     "create_diagram_for_metric": [
       "pace",
       "entropy",

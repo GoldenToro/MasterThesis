@@ -280,18 +280,32 @@ class ExperimentSession:
         return copied
 
     def cleanup_outputs(self) -> None:
-        """Remove intermediate maps and apply the configured raw-data policy."""
+        """Remove temporary data after analysis has returned successfully."""
         for map_path in self.output_dir.glob("epoch_*/*.map.json"):
-            map_path.unlink(missing_ok=True)
+            unity_path = map_path.with_name(
+                map_path.name.removesuffix(".map.json") + ".unity.json"
+            )
+            if unity_path.is_file():
+                map_path.unlink()
+
+        analysis_settings = self.experiment.get("analysis_settings", {})
+        if bool(analysis_settings.get("only_keep_result_summary", False)):
+            for directory_name in ("_raw", "llm_map_attempts"):
+                directory = self.output_dir / directory_name
+                if directory.is_dir():
+                    shutil.rmtree(directory)
+
+            for checkpoint_path in self.output_dir.glob(
+                "epoch_*/checkpoint.pkl"
+            ):
+                checkpoint_path.unlink()
+
+            return
 
         raw_dir = self.output_dir / "_raw"
-        if bool(self.experiment.get("analysis_settings", {}).get("only_keep_result_summary", False)):
-            shutil.rmtree(raw_dir, ignore_errors=True)
-            return
         self._remove_empty_directories(raw_dir)
         if raw_dir.is_dir() and next(raw_dir.iterdir(), None) is None:
             raw_dir.rmdir()
-
     def _evaluate_map(
         self,
         canonical_map: CanonicalMap,

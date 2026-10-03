@@ -118,21 +118,51 @@ class ExperimentAnalyzer:
             generator_population_metrics,
         )
 
-        # History uses the objectives recorded during generation.
-        history_names = set(self._goal_by_metric()) | set(generator_map_metrics)
+        diagram_names = {
+            normalize_metric_name(name)
+            for name in self.settings.get("create_diagram_for_metric", [])
+        }
+
+        for context in contexts:
+            metrics = context.record.setdefault("metrics", {})
+            missing = [
+                name for name in requested_map_metrics
+                if name in diagram_names and name not in metrics
+            ]
+            if missing:
+                metrics.update(
+                    calculate_metrics(
+                        context.match_records,
+                        missing,
+                        context,
+                    )
+                )
+
+        history_names = (
+            set(self._goal_by_metric())
+            | set(generator_map_metrics)
+            | diagram_names
+        )
         history_map_metrics = [
-            name for name in requested_map_metrics if name in history_names
+            name for name in requested_map_metrics
+            if name in history_names
         ]
+        history_population_metrics = [
+            name for name in requested_population_metrics
+            if name in generator_population_metrics
+            or name in diagram_names
+        ]
+
         epoch_views = self._build_epoch_views(contexts)
         epoch_rows, unavailable_by_epoch = self._write_results_by_epoch_csv(
             epoch_views,
             history_map_metrics,
-            generator_population_metrics,
+            history_population_metrics,
         )
         diagrams = self._create_diagrams(
             epoch_views,
             epoch_rows,
-            history_map_metrics + generator_population_metrics,
+            history_map_metrics + history_population_metrics,
         )
 
         final_analysis = {

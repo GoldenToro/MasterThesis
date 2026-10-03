@@ -44,8 +44,7 @@ class ExperimentAnalyzer:
         self.results_csv = run_dir / "results.csv"
         self.results_by_epoch_csv = run_dir / "results_by_epoch.csv"
         self.export_dir = run_dir / "export"
-
-    def run(self) -> dict[str, Any]:
+    def run(self, final_map_ids) -> dict[str, Any]:
         if bool(self.settings.get("enabled", False)) is False:
             return {"enabled": False}
 
@@ -55,6 +54,20 @@ class ExperimentAnalyzer:
             context.all_records = records
             context.all_contexts = contexts
 
+        contexts_by_id = {
+            context.record["map_id"]: context
+            for context in contexts
+        }
+        missing = set(final_map_ids) - contexts_by_id.keys()
+        if missing:
+            raise ValueError(
+                "Selected maps have no results: " + ", ".join(sorted(missing))
+            )
+        final_contexts = [
+            contexts_by_id[map_id]
+            for map_id in final_map_ids
+        ]
+
         requested_metrics = self._requested_metrics()
         requested_map_metrics = [
             name for name in requested_metrics if name in MAP_METRIC_NAMES
@@ -63,76 +76,92 @@ class ExperimentAnalyzer:
             name for name in requested_metrics if name in POPULATION_METRIC_NAMES
         ]
 
+        generator_descriptors = {
+            "generation_time_per_map",
+            "repair_count",
+            "constraint_violation_count",
+            "generator_method_label",
+            "genome_representation_type",
+        }
+        generator_map_metrics = [
+            name for name in requested_map_metrics
+            if name in generator_descriptors
+        ]
+        final_map_metrics = [
+            name for name in requested_map_metrics
+            if name not in generator_descriptors
+        ]
+        final_population_metrics = [
+            name for name in requested_population_metrics
+            if name in {"map_diversity", "expressive_range"}
+        ]
+        generator_population_metrics = [
+            name for name in requested_population_metrics
+            if name not in final_population_metrics
+        ]
+
         LOGGER.info(
-            "Analyze experiment '%s' with %s metrics.",
-            self.experiment.get("experiment_name"),
-            len(requested_metrics),
+            "Analyze %s generated maps and %s selected population members.",
+            len(contexts),
+            len(final_contexts),
         )
 
-        unavailable_by_metric: dict[str, int] = {
-            name: 0 for name in requested_map_metrics
-        }
-        experiment_population_context = PopulationMetricContext(
-            population_contexts=contexts,
-            evaluated_contexts=contexts,
-            experiment=self.experiment,
+        generator_statistics = self._metric_statistics(
+            contexts, generator_map_metrics
         )
-        experiment_metrics: dict[str, Any] = {}
-        unavailable_experiment_metrics: dict[str, int] = {
-            name: 0 for name in requested_population_metrics
-        }
+        generator_values = calculate_population_metrics(
+            PopulationMetricContext(
+                population_contexts=contexts,
+                evaluated_contexts=contexts,
+                experiment=self.experiment,
+            ),
+            generator_population_metrics,
+        )
 
-        metric_count = len(requested_metrics)
-        for metric_index, metric_name in enumerate(requested_metrics, start=1):
-            LOGGER.info(
-                "    Analyze %s ... (Metric %s/%s)",
-                metric_name,
-                metric_index,
-                metric_count,
-            )
-            if metric_name in POPULATION_METRIC_NAMES:
-                value = calculate_population_metrics(
-                    experiment_population_context,
-                    [metric_name],
-                )[metric_name]
-                experiment_metrics[metric_name] = value
-                if value is None:
-                    unavailable_experiment_metrics[metric_name] = 1
-                continue
-
-            for context in contexts:
-                value = calculate_metrics(
-                    context.match_records,
-                    [metric_name],
-                    context,
-                )[metric_name]
-                context.record.setdefault("metrics", {})[metric_name] = value
-                if value is None:
-                    unavailable_by_metric[metric_name] += 1
-
-        # Population metrics are deliberately kept out of individual result rows.
-        for context, result_path in zip(contexts, paths):
-            metrics = context.record.setdefault("metrics", {})
-            for name in POPULATION_METRIC_NAMES:
-                metrics.pop(name, None)
-            context.record["analysis_metrics"] = requested_map_metrics
-            context.record["analysis_population_metrics"] = requested_population_metrics
-            result_path.write_text(
-                json.dumps(context.record, indent=2),
-                encoding="utf-8",
-            )
-
+        # History uses the objectives recorded during generation.
+        history_names = set(self._goal_by_metric()) | set(generator_map_metrics)
+        history_map_metrics = [
+            name for name in requested_map_metrics if name in history_names
+        ]
         epoch_views = self._build_epoch_views(contexts)
-        self._rewrite_results_csv(records, requested_map_metrics)
         epoch_rows, unavailable_by_epoch = self._write_results_by_epoch_csv(
             epoch_views,
-            requested_map_metrics,
-            requested_population_metrics,
+            history_map_metrics,
+            generator_population_metrics,
         )
         diagrams = self._create_diagrams(
             epoch_views,
             epoch_rows,
-            requested_metrics,
+            history_map_metrics + generator_population_metrics,
+        )
+
+        final_analysis = {
+            "selected_map_count": len(final_contexts),
+            "map_statistics": self._metric_statistics(
+                final_contexts, final_map_metrics
+            ),
+            "population_metrics": calculate_population_metrics(
+                PopulationMetricContext(
+                    population_contexts=final_contexts,
+                    evaluated_contexts=final_contexts,
+                    experiment=self.experiment,
+                ),
+                final_population_metrics,
+            ),
+        }
+
+        for context, result_path in zip(contexts, paths):
+            result_path.write_text(
+                json.dumps(context.record, indent=2),
+                encoding="utf-8",
+            )
+        self._rewrite_results_csv(records, requested_map_metrics)
+
+        self.export_dir.mkdir(parents=True, exist_ok=True)
+        final_path = self.export_dir / "analysis_final.json"
+        final_path.write_text(
+            json.dumps(final_analysis, indent=2),
+            encoding="utf-8",
         )
 
         summary = {
@@ -141,26 +170,53 @@ class ExperimentAnalyzer:
             "epoch_count": len(epoch_views),
             "calculated_metrics": requested_metrics,
             "metric_scopes": {
-                "individual_map": requested_map_metrics,
-                "population_or_generator": requested_population_metrics,
+                "individual_map": generator_map_metrics,
+                "population_or_generator": generator_population_metrics,
             },
-            "unavailable_value_count": unavailable_by_metric,
+            "map_statistics": generator_statistics,
+            "experiment_metrics": generator_values,
+            "unavailable_value_count": {
+                name: len(contexts) - generator_statistics[f"{name}_count"]
+                for name in generator_map_metrics
+            },
             "unavailable_epoch_count": unavailable_by_epoch,
-            "unavailable_experiment_metric_count": unavailable_experiment_metrics,
-            "experiment_metrics": experiment_metrics,
+            "unavailable_experiment_metric_count": {
+                name: int(value is None)
+                for name, value in generator_values.items()
+            },
             "diagrams": [str(path.relative_to(self.run_dir)) for path in diagrams],
             "results_csv": str(self.results_csv.relative_to(self.run_dir)),
             "results_by_epoch_csv": str(
                 self.results_by_epoch_csv.relative_to(self.run_dir)
             ),
+            "analysis_final": str(final_path.relative_to(self.run_dir)),
         }
-        self.export_dir.mkdir(parents=True, exist_ok=True)
         (self.export_dir / "analysis_summary.json").write_text(
             json.dumps(summary, indent=2),
             encoding="utf-8",
         )
         LOGGER.info("Finished analysis. Exports: %s", self.export_dir)
         return summary
+
+    def _metric_statistics(self, contexts, metric_names):
+        statistics = {}
+        for name in metric_names:
+            values = []
+            for context in contexts:
+                value = calculate_metrics(
+                    context.match_records, [name], context
+                )[name]
+                values.append(value)
+                context.record.setdefault("metrics", {}).setdefault(name, value)
+
+            self._add_metric_epoch_values(
+                statistics, name, values, best_goal=None
+            )
+
+        return {
+            key: None if value == "" else value
+            for key, value in statistics.items()
+        }
 
     def _requested_metrics(self) -> list[str]:
         if bool(self.settings.get("calculate_all_metrics", False)):

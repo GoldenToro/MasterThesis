@@ -350,6 +350,62 @@ class ExperimentSession:
         self._remove_empty_directories(raw_dir)
         if raw_dir.is_dir() and next(raw_dir.iterdir(), None) is None:
             raw_dir.rmdir()
+    def _select_final_maps(self, map_ids):
+        if not map_ids:
+            return []
+
+        count = self.generator_settings.get("final_map_count")
+        if count is None:
+            count = len(map_ids)
+
+        with self.results_csv.open(
+                "r", newline="", encoding="utf-8"
+        ) as handle:
+            records = {
+                row["map_id"]: row
+                for row in csv.DictReader(handle, delimiter=";")
+            }
+
+        missing = set(map_ids) - records.keys()
+        if missing:
+            raise ValueError(
+                "Final candidates have no results: "
+                + ", ".join(sorted(missing))
+            )
+
+        eligible = []
+        for map_id in map_ids:
+            record = records[map_id]
+
+            if record.get("valid") != "true":
+                continue
+            if record.get("status") not in {
+                "completed",
+                "partial_failure",
+                "simulation_disabled",
+            }:
+                continue
+
+            try:
+                fitness = float(record.get("fitness_value"))
+            except (TypeError, ValueError):
+                continue
+
+            if math.isfinite(fitness):
+                eligible.append((map_id, fitness))
+
+        eligible.sort(key=lambda item: item[1], reverse=True)
+        selected = [map_id for map_id, _ in eligible[:count]]
+
+        if len(selected) < count:
+            LOGGER.warning(
+                "Requested %s final maps; only %s eligible outputs "
+                "are available. No replacements will be generated.",
+                count,
+                len(selected),
+            )
+
+        return selected
 
     def _evaluate_map(
             self,

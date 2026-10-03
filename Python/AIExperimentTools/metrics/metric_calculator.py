@@ -838,7 +838,7 @@ def _controllability_score(context: MetricContext) -> float | None:
 
 
 def _population_map_diversity(context: PopulationMetricContext) -> float | None:
-    """Mean pairwise tile Hamming distance inside the population.
+    """Mean pairwise wall/floor Hamming distance inside the population.
 
     Duplicate population members are preserved and contribute a distance of zero,
     which correctly lowers diversity when the population contains clones.
@@ -855,7 +855,7 @@ def _population_map_diversity(context: PopulationMetricContext) -> float | None:
             if first.width != second.width or first.height != second.height:
                 continue
             differences = sum(
-                left != right
+                (left == WALL) != (right == WALL)
                 for first_row, second_row in zip(first.grid, second.grid)
                 for left, right in zip(first_row, second_row)
             )

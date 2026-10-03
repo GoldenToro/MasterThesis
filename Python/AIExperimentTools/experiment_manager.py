@@ -95,7 +95,9 @@ class ExperimentManager:
             copied_final_candidate_maps = base_generator.copy_final_candidate_maps(
                 final_map_ids
             )
-            analysis_summary = ExperimentAnalyzer(run_dir, experiment).run()
+            analysis_summary = ExperimentAnalyzer(
+                run_dir, experiment
+            ).run(final_map_ids)
             base_generator.cleanup_outputs()
 
             finished_at = datetime.now().astimezone()

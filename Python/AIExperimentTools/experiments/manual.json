@@ -3,6 +3,7 @@
   "generator": "manual",
   "generator_settings": {
     "repair_enabled": true,
+    "repair_max_changed_cells": 8,
     "maps_directory": "generators/manual/maps",
     "copy_final_candidate_maps": true,
     "validation": {

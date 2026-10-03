@@ -6,6 +6,7 @@
     "map_width": 64,
     "map_height": 64,
     "repair_enabled": true,
+    "repair_max_changed_cells": 8,
     "copy_final_candidate_maps": true,
     "validation": {
       "minimum_spawn_count": 2,

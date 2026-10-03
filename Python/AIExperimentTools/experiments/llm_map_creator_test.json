@@ -22,6 +22,7 @@
       "store": false
     },
     "repair_enabled": true,
+    "repair_max_changed_cells": 8,
     "copy_final_candidate_maps": true,
     "validation": {
       "minimum_spawn_count": 2,

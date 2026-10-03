@@ -27,7 +27,10 @@
     "room_padding": 1,
     "max_depth": 5,
     "corridor_width": 2,
-    "extra_connection_probability": 0.15
+    "extra_connection_probability": 0.15,
+    "map_completion": {
+      "mode": "generator"
+    }
   },
   "simulator_settings": {
     "enabled": true,

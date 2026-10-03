@@ -28,7 +28,13 @@
     "room_padding": 1,
     "corridor_width": 2,
     "max_placement_attempts": 500,
-    "extra_connection_probability": 0.15
+    "extra_connection_probability": 0.15,
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    }
   },
   "simulator_settings": {
     "enabled": true,

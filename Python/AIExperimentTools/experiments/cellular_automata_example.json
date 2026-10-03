@@ -27,7 +27,10 @@
     "wall_neighbor_threshold": 5,
     "minimum_region_size": 20,
     "connect_regions": true,
-    "corridor_width": 1
+    "corridor_width": 1,
+    "map_completion": {
+      "mode": "generator"
+    }
   },
   "simulator_settings": {
     "enabled": true,

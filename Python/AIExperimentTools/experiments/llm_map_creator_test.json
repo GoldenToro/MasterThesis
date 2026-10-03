@@ -50,6 +50,9 @@
           "maximum": 20.0
         }
       ]
+    },
+    "map_completion": {
+      "mode": "generator"
     }
   },
   "simulator_settings": {

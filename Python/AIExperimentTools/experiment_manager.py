@@ -175,6 +175,29 @@ class ExperimentManager:
             raise ValueError(f"Experiment {path} is missing fields: {missing}")
 
         generator = experiment["generator_settings"]
+        completion = generator.get("map_completion")
+        if not isinstance(completion, dict):
+            raise ValueError("generator_settings.map_completion is required")
+
+        mode = completion.get("mode")
+        if mode not in ("generic", "generator"):
+            raise ValueError("map_completion.mode must be generic or generator")
+
+        if mode == "generic":
+            for name in ("seed", "health_count", "ammo_count"):
+                value = completion.get(name)
+                if type(value) is not int or value < 0:
+                    raise ValueError(
+                        f"map_completion.{name} must be a non-negative integer"
+                    )
+
+            minimum_spawns = int(
+                generator.get("validation", {}).get("minimum_spawn_count", 2)
+            )
+            if minimum_spawns > 2:
+                raise ValueError(
+                    "Generic map completion places exactly two spawns"
+                )
 
         metric_specs = generator.get("fitness", {}).get("metrics", [])
         if len(metric_specs) == 0:

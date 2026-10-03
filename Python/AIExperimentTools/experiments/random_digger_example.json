@@ -29,7 +29,10 @@
     "revisit_probability": 0.15,
     "room_chance": 0.03,
     "room_min_size": 3,
-    "room_max_size": 7
+    "room_max_size": 7,
+    "map_completion": {
+      "mode": "generator"
+    }
   },
   "simulator_settings": {
     "enabled": true,

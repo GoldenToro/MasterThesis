@@ -17,6 +17,7 @@ from map_schema.canonical_map import CanonicalMap
 from map_schema.map_exporter import load_canonical_map, save_canonical_map
 from map_schema.map_repairer import MapRepairer
 from map_schema.map_validator import MapValidator
+from map_schema.map_completion import complete_map, strip_objects
 from metrics.metric_calculator import MetricContext, calculate_metrics, normalize_metric_name
 from generators.registry import load_generator
 from simulation.unity_runner import UnityRunner
@@ -297,27 +298,51 @@ class ExperimentSession:
         epoch_dir: Path,
     ) -> dict[str, Any]:
         generation = self.generator_settings
-        validation_settings = generation.get("validation", {})
-        validator = MapValidator(validation_settings)
-        validation_before = validator.validate(canonical_map)
+        completion = generation["map_completion"]
+        generic_placement = completion["mode"] == "generic"
+
+        validation_settings = dict(generation.get("validation", {}))
+        validation_settings["minimum_spawn_count"] = max(
+            2, int(validation_settings.get("minimum_spawn_count", 2))
+        )
+        layout_settings = {**validation_settings, "minimum_spawn_count": 0}
+        layout_validator = MapValidator(layout_settings)
+
+        if generic_placement:
+            canonical_map = strip_objects(canonical_map)
+
+        validation_before = layout_validator.validate(canonical_map)
         repair_report: dict[str, Any] = {"changed": False, "actions": []}
 
-        if validation_before.valid is False and bool(
-            generation.get("repair_enabled", False)
-        ):
+        if not validation_before.valid and generation.get("repair_enabled", False):
             canonical_map, repair = MapRepairer().repair(
                 canonical_map,
-                minimum_spawn_count=int(
-                    validation_settings.get("minimum_spawn_count", 2)
-                ),
+                minimum_spawn_count=0,
             )
             repair_report = repair.to_dict()
-            save_canonical_map(
-                canonical_map,
-                epoch_dir / f"{canonical_map.map_id}.map.json",
+
+        completion_error = None
+        if generic_placement and layout_validator.validate(canonical_map).valid:
+            try:
+                canonical_map = complete_map(
+                    canonical_map,
+                    seed=completion["seed"],
+                    health_count=completion["health_count"],
+                    ammo_count=completion["ammo_count"],
+                )
+            except ValueError as exc:
+                completion_error = str(exc)
+
+        validation = MapValidator(validation_settings).validate(canonical_map)
+        if completion_error is not None:
+            validation.valid = False
+            validation.errors.append(f"Map completion failed: {completion_error}")
+
+        save_canonical_map(
+            canonical_map,
+            epoch_dir / f"{canonical_map.map_id}.map.json",
             )
 
-        validation = validator.validate(canonical_map)
         epoch, numeric_id = self._map_sort_key(canonical_map)
         match_records: list[dict[str, Any]] = []
         requested = int(self.simulator_settings.get("simulations_per_map", 1))

@@ -19,8 +19,9 @@ class MapResponseResult:
 class GrokMapCreator:
     """Ask Grok to create one complete canonical JSON grid map."""
 
-    def __init__(self, settings: dict[str, Any]):
+    def __init__(self, settings: dict[str, Any], *, layout_only: bool = False):
         self.settings = dict(settings)
+        self.layout_only = layout_only
         self.model = str(self.settings.get("model", "grok-4.5"))
         self.base_url = str(self.settings.get("base_url", "https://api.x.ai/v1"))
         self.api_key = str(self.settings.get("api_key"))
@@ -113,7 +114,18 @@ class GrokMapCreator:
         )
 
     @staticmethod
-    def _system_prompt() -> str:
+    def _system_prompt(self) -> str:
+        if self.layout_only:
+            return (
+                "You create top-down FPS layouts as canonical JSON. Return the "
+                "tile grid itself, never generator parameters or algorithms. "
+                "Use only # for walls and . for floor. Keep the outer border "
+                "sealed with # and build one connected playable region. "
+                "Follow the requested dimensions exactly. Do not place spawns, "
+                "health, or ammo: the framework adds those later. Ignore object "
+                "placement requests in the designer rules, examples, or feedback."
+            )
+
         return (
             "You create complete top-down FPS maps as canonical JSON. Return the "
             "finished tile grid itself, never generator parameters, algorithms, "
@@ -124,8 +136,8 @@ class GrokMapCreator:
             "spawns. Follow the requested dimensions exactly."
         )
 
-    @staticmethod
     def _user_prompt(
+        self,
         *,
         rules_text: str,
         map_id: str,
@@ -156,7 +168,7 @@ class GrokMapCreator:
             f"- every grid string contains exactly {width} symbols",
             "- the first and last row contain only #",
             "- the first and last symbol of every row are #",
-            "- use only # . S H A",
+            "- use only # ." if self.layout_only else "- use only # . S H A",
             "- all walkable cells form one connected region",
             f"- validation settings: {json.dumps(validation, sort_keys=True)}",
             "- metadata.design_summary briefly explains the layout",

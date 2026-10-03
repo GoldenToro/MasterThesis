@@ -11,6 +11,7 @@ from generators.llm_map_creator.map_processing import DirectMapProcessor
 from generators.llm_map_creator.schemas import DirectCanonicalMapResponse
 from map_schema.canonical_map import CanonicalMap
 from map_schema.map_validator import MapValidator
+from map_schema.map_completion import strip_objects
 from candidate import Candidate
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
@@ -19,6 +20,7 @@ LOGGER = logging.getLogger("FPS-EVALUATOR")
 def run(base_generator: ExperimentSession) -> list[str]:
     """Generate complete canonical grid maps directly with Grok."""
     settings = base_generator.generator_settings
+    generic_placement = settings["map_completion"]["mode"] == "generic"
     map_count = int(settings.get("map_count", 4))
     width = int(settings.get("map_width", 48))
     height = int(settings.get("map_height", 48))
@@ -26,6 +28,10 @@ def run(base_generator: ExperimentSession) -> list[str]:
         raise ValueError("llm_map_creator map_count must be between 1 and 32")
 
     validation_settings = dict(settings.get("validation", {}))
+    validation_settings["minimum_spawn_count"] = (
+        0 if generic_placement
+        else max(2, int(validation_settings.get("minimum_spawn_count", 2)))
+    )
     minimum_ratio = float(validation_settings.get("minimum_walkable_ratio", 0.0))
     maximum_ratio = float(validation_settings.get("maximum_walkable_ratio", 1.0))
     if minimum_ratio > maximum_ratio:
@@ -42,12 +48,13 @@ def run(base_generator: ExperimentSession) -> list[str]:
         raise ValueError("generator_settings.rules_text requires text")
 
     examples = _load_examples(base_generator)
-    creator = GrokMapCreator(dict(settings.get("grok", {})))
+    creator = GrokMapCreator(
+        dict(settings.get("grok", {})),
+        layout_only=generic_placement,
+    )
     processor = DirectMapProcessor(width, height, validation_settings)
     validator = MapValidator(validation_settings)
     maximum_attempts = max(1, min(5, int(settings.get("max_attempts_per_map", 2))))
-    repair_enabled = bool(settings.get("repair_enabled", True))
-    minimum_spawn_count = int(validation_settings.get("minimum_spawn_count", 2))
 
     generated_maps: list[CanonicalMap] = []
     generation_summary: list[dict[str, Any]] = []
@@ -89,16 +96,14 @@ def run(base_generator: ExperimentSession) -> list[str]:
                 map_id=desired_map_id,
                 metadata=metadata,
             )
+            if generic_placement:
+                canonical_map = strip_objects(canonical_map)
+
             validation_before = validator.validate(canonical_map)
 
             repair_actions: list[str] = []
-            if repair_enabled:
-                canonical_map, repair = processor.repair(
-                    canonical_map,
-                    minimum_spawn_count=minimum_spawn_count,
-                )
-                repair_actions = repair.actions
             combined_actions = normalization.actions + repair_actions
+
             if combined_actions:
                 canonical_map = canonical_map.replace_grid(
                     canonical_map.grid,

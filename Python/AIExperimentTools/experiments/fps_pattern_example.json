@@ -25,7 +25,10 @@
     "route_count_min": 2,
     "route_count_max": 5,
     "corridor_width_min": 1,
-    "corridor_width_max": 3
+    "corridor_width_max": 3,
+    "map_completion": {
+      "mode": "generator"
+    }
   },
   "simulator_settings": {
     "enabled": true,

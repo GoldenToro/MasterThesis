@@ -18,6 +18,9 @@
           "goal": "maximize"
         }
       ]
+    },
+    "map_completion": {
+      "mode": "generator"
     }
   },
   "simulator_settings": {

@@ -27,7 +27,10 @@
     "room_fill_ratio": 0.75,
     "room_padding": 1,
     "corridor_width": 2,
-    "loop_probability": 0.25
+    "loop_probability": 0.25,
+    "map_completion": {
+      "mode": "generator"
+    }
   },
   "simulator_settings": {
     "enabled": true,

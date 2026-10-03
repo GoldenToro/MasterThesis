@@ -411,18 +411,26 @@ def _maximum_unity(context: MetricContext, key: str) -> float | None:
 
 
 def _pooled_accuracy(
-    context: MetricContext,
-    hit_key: str,
-    shot_key: str,
-    fallback_key: str,
+        context: MetricContext,
+        hit_key: str,
+        projectile_key: str,
 ) -> float | None:
-    hits = [float(record[hit_key]) for record in context.match_records if _is_number(record.get(hit_key))]
-    shots = [float(record[shot_key]) for record in context.match_records if _is_number(record.get(shot_key))]
-    if len(hits) == len(shots) and len(hits) > 0:
-        total_shots = sum(shots)
-        return sum(hits) / total_shots if total_shots > 0 else 0.0
-    return _mean_unity(context, fallback_key)
+    if not context.match_records:
+        return None
 
+    total_hits = 0.0
+    total_projectiles = 0.0
+    for record in context.match_records:
+        hits = record.get(hit_key)
+        projectiles = record.get(projectile_key)
+        if not _is_number(hits) or not _is_number(projectiles):
+            return None
+        if hits < 0 or projectiles < 0 or (projectiles == 0 and hits > 0):
+            return None
+        total_hits += float(hits)
+        total_projectiles += float(projectiles)
+
+    return total_hits / total_projectiles if total_projectiles > 0 else None
 
 def _raw_count(context: MetricContext, pattern: str, values: list[Any]) -> int | None:
     # Missing log files mean the metric is unavailable. Existing empty files mean 0.
@@ -672,7 +680,8 @@ def _kill_ratio(context: MetricContext) -> float | None:
         if _is_number(first) and _is_number(second):
             high = max(float(first), float(second))
             low = min(float(first), float(second))
-            values.append(low / high if high else 1.0)
+            if high > 0:
+                values.append(low / high)
     return mean(values) if values else None
 
 
@@ -1056,10 +1065,10 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
     "number_of_hits_bot_1": _direct_unity("numberOfHits1"),
     "number_of_hits_bot_2": _direct_unity("numberOfHits2"),
     "accuracy_bot_1": lambda context: _pooled_accuracy(
-        context, "numberOfHits1", "numberOfShots1", "accuracy1"
+        context, "numberOfHits1", "numberOfProjectiles1"
     ),
     "accuracy_bot_2": lambda context: _pooled_accuracy(
-        context, "numberOfHits2", "numberOfShots2", "accuracy2"
+        context, "numberOfHits2", "numberOfProjectiles2"
     ),
     "number_of_fights_bot_1": _direct_unity("numberOfFights1"),
     "number_of_fights_bot_2": _direct_unity("numberOfFights2"),

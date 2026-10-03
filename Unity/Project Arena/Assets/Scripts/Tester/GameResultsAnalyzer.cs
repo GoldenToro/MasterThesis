@@ -155,24 +155,17 @@ namespace Tester
 
         public Dictionary<string, object> CompileResults(float gameLength)
         {
-            // TODO Is everything done by the end of the game? e.g. killstreaks are closed, searches are over, ...
-
-            // Compile accuracy data
-            var totalKeys = new HashSet<int>(numberOfShots.Keys);
-            totalKeys.UnionWith(numberOfHits.Keys);
-
-            var accuracy = new Dictionary<int, float>();
-            foreach (var key in totalKeys)
+            // Accuracy is hits per projectile. No projectiles means unavailable.
+            var accuracy = new Dictionary<int, float?>();
+            foreach (var botID in new[] { bot1ID, bot2ID })
             {
-                numberOfProjectiles.TryGetValue(key, out var projectiles);
-                numberOfHits.TryGetValue(key, out var hits);
-                if (hits == 0)
-                    accuracy.Add(key, 0);
-                else
-                    accuracy.Add(key, hits / (float) projectiles);
+                numberOfProjectiles.TryGetValue(botID, out var projectiles);
+                numberOfHits.TryGetValue(botID, out var hits);
+                accuracy[botID] = projectiles > 0
+                    ? (float?) hits / projectiles
+                    : null;
             }
-
-            var killStreakAverage = new Dictionary<int, float>();
+            var killStreakAverage = new Dictionary<int, float?>();
             foreach (var key in nonZeroKillStreaksCount.Keys)
             {
                 CloseKillStreak(key);
@@ -182,25 +175,42 @@ namespace Tester
             }
 
             var totalFrags = numberOfFrags.Sum(entry => entry.Value);
-            var entropy = numberOfFrags.Sum(
-                entry => -entry.Value / (float) totalFrags * Mathf.Log(entry.Value / (float) totalFrags, 2)
-            );
+            float? entropy = totalFrags > 0
+                ? (float?) numberOfFrags
+                    .Where(entry => entry.Value > 0)
+                    .Sum(entry =>
+                    {
+                        var probability = entry.Value / (float) totalFrags;
+                        return -probability * Mathf.Log(probability, 2);
+                    })
+                : null;
 
             var numberOfFightsSum = numberOfFights.Sum(entry => entry.Value);
             var timeToEngageSum = timeToEngage.Sum(entry => entry.Value);
-            var pace = 2 / (1 + Mathf.Exp(-5 * numberOfFightsSum / timeToEngageSum)) - 1;
+            float? pace = timeToEngageSum > 0
+                ? (float?) (
+                    2f / (1f + Mathf.Exp(-5f * numberOfFightsSum / timeToEngageSum)) - 1f
+                )
+                : null;
 
             var timeInFightSum = timeInFight.Sum(entry => entry.Value);
             var timeBetweenSightsSum = timeBetweenSights.Sum(entry => entry.Value);
             var timeToSurrenderSum = timeToSurrender.Sum(entry => entry.Value);
             var numberOfRetreatsSum = numberOfRetreats.Sum(entry => entry.Value);
+
             var pursueTime = timeInFightSum / (2 * gameLength);
-            var fightTime = (timeInFightSum - timeBetweenSightsSum - timeToSurrenderSum) / (2 * gameLength);
+            var fightTime =
+                (timeInFightSum - timeBetweenSightsSum - timeToSurrenderSum)
+                / (2 * gameLength);
 
-            var sightLossRate = timeBetweenSightsSum / timeInFightSum;
-            var targetLossRate = numberOfRetreatsSum / (float) numberOfFightsSum;
+            float? sightLossRate = timeInFightSum > 0
+                ? (float?) timeBetweenSightsSum / timeInFightSum
+                : null;
 
-            return new Dictionary<string, object>
+            float? targetLossRate = numberOfFightsSum > 0
+                ? (float?) numberOfRetreatsSum / numberOfFightsSum
+                : null;
+            var compiled = new Dictionary<string, object>
             {
                 {"timeInFight1", timeInFight.GetOrDefault(bot1ID)},
                 {"timeInFight2", timeInFight.GetOrDefault(bot2ID)},
@@ -222,6 +232,8 @@ namespace Tester
                 {"numberOfSuicides2", numberOfSuicides.GetOrDefault(bot2ID)},
                 {"numberOfShots1", numberOfShots.GetOrDefault(bot1ID)},
                 {"numberOfShots2", numberOfShots.GetOrDefault(bot2ID)},
+                {"numberOfProjectiles1", numberOfProjectiles.GetOrDefault(bot1ID)},
+                {"numberOfProjectiles2", numberOfProjectiles.GetOrDefault(bot2ID)},
                 {"numberOfHits1", numberOfHits.GetOrDefault(bot1ID)},
                 {"numberOfHits2", numberOfHits.GetOrDefault(bot2ID)},
                 {"accuracy1", accuracy.GetOrDefault(bot1ID)},
@@ -237,6 +249,12 @@ namespace Tester
                 {"sightLossRate", sightLossRate},
                 {"targetLossRate", targetLossRate}
             };
+            foreach (var key in compiled.Keys.ToArray())
+            {
+                if (compiled[key] is float value &&
+                    (float.IsNaN(value) || float.IsInfinity(value)))
+                {
+                    compiled[key]
         }
     }
 }

@@ -1,19 +1,14 @@
 import random
 
-from ..ab_genome.ab_genome import AB_NUM_ROOMS, AB_NUM_CORRIDORS
 from ..ab_genome.generation import create_room, create_corridor
 
-MUTATE_PROBABILITY = 0.2
+def mutate(individual, gene_mutation_probability=0.2):
+    for index in range(len(individual.rooms)):
+        if random.random() < gene_mutation_probability:
+            individual.rooms[index] = create_room()
 
-
-def mutate(individual):
-    for x in range(AB_NUM_ROOMS):
-        if random.random() < MUTATE_PROBABILITY:
-            individual.rooms[x] = create_room()
-
-    for x in range(AB_NUM_CORRIDORS):
-        if random.random() < MUTATE_PROBABILITY:
-            individual.corridors[x] = create_corridor()
+    for index in range(len(individual.corridors)):
+        if random.random() < gene_mutation_probability:
+            individual.corridors[index] = create_corridor()
 
     return individual,
-

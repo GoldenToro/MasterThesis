@@ -7,6 +7,7 @@
     "population_size": 40,
     "mate_probability": 0.3,
     "mutate_probability": 0.3,
+    "gene_mutation_probability": 0.2,
     "map_width": 64,
     "map_height": 64,
     "map_scale": 2,

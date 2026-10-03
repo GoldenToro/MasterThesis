@@ -88,7 +88,17 @@ def run(base_generator: ExperimentSession) -> list[str]:
     toolbox.register("individual", create_random_genome, individual_class)
     toolbox.register("clone", copy.deepcopy)
     toolbox.register("mate", crossover)
-    toolbox.register("mutate", mutate)
+    gene_mutation_probability = float(
+        settings.get("gene_mutation_probability", 0.2)
+    )
+    if not 0.0 <= gene_mutation_probability <= 1.0:
+        raise ValueError("gene_mutation_probability must be between 0 and 1")
+
+    toolbox.register(
+        "mutate",
+        mutate,
+        gene_mutation_probability=gene_mutation_probability,
+    )
     toolbox.register("select", tools.selNSGA2)
 
     random.seed(base_generator.seed)

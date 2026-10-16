@@ -14,7 +14,7 @@ from typing import Any
 # Manual Unity-run settings
 # -----------------------------------------------------------------------------
 # Adjust these values for your local Project Arena build.
-UNITY_RUNNER_DIRECTORY = Path(r"E:\Thesis-Projekt\ProjectArena-thesis\Builds")
+UNITY_RUNNER_DIRECTORY = Path(r"E:\Thesis-Projekt\ProjectArena-thesis\Builds\manual-viewer")
 UNITY_RUNNER_FILE = "Project Arena.exe"
 
 # Bot JSON files used by map-test configurations that reference prefixes such as
@@ -28,9 +28,7 @@ OUTPUT_ROOT = Path(__file__).resolve().parent / "results_manual_runs"
 TIMEOUT_SECONDS = 3600
 CAPTURE_UNITY_LOG = True
 
-# The requested default: keep Unity batch mode, but initialize graphics by
-# omitting -nographics. Set USE_BATCHMODE to False to show the normal player
-# window as well.
+# Visible playback requires both flags to stay False.
 USE_BATCHMODE = False
 USE_NOGRAPHICS = False
 
@@ -123,6 +121,8 @@ def run_unity_map(source_config: Path) -> Path:
         command.append("-batchmode")
     if USE_NOGRAPHICS:
         command.append("-nographics")
+    if not USE_BATCHMODE and not USE_NOGRAPHICS:
+        command.extend(["-screen-fullscreen", "0", "-screen-width", "1280", "-screen-height", "800"])
 
     if CAPTURE_UNITY_LOG:
         command.extend(

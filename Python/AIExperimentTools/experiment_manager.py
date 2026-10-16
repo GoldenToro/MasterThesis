@@ -43,10 +43,13 @@ class ExperimentManager:
         dry_run: bool = False,
         *,
         batch_dir: Path | None = None,
+        iteration: int = 1,
     ) -> Path:
         source_experiment = self._load_json(config_path)
         experiment = copy.deepcopy(source_experiment)
         generator_settings = experiment.setdefault("generator_settings", {})
+        if "no_of_experiments" in experiment:
+            generator_settings["seed"] = -1
         generator_settings.setdefault(
             "map_scale",
             self.settings.get("unity", {}).get("map_scale", 2.0),
@@ -62,7 +65,9 @@ class ExperimentManager:
             batch_dir = self._create_batch_directory(started_at)
 
         run_dir = self._create_run_directory(
-            str(experiment["experiment_name"]),
+            (f"{experiment['experiment_name']}_{iteration}"
+             if "no_of_experiments" in experiment
+             else str(experiment["experiment_name"])),
             batch_dir,
         )
         (run_dir / "_raw").mkdir(parents=True, exist_ok=True)
@@ -154,6 +159,35 @@ class ExperimentManager:
             traceback.print_exc()
             raise
 
+    def run_experiments(
+        self,
+        config_path: Path,
+        dry_run: bool = False,
+        *,
+        batch_dir: Path | None = None,
+    ) -> list[Path]:
+        experiment = self._load_json(config_path)
+        count = experiment.get("no_of_experiments", 1)
+        if type(count) is not int or count <= 0:
+            raise ValueError("no_of_experiments must be a positive integer")
+        if batch_dir is None:
+            batch_dir = self._create_batch_directory(datetime.now().astimezone())
+        results: list[Path] = []
+        for iteration in range(1, count + 1):
+            try:
+                results.append(self.run_config(
+                    config_path,
+                    dry_run=dry_run,
+                    batch_dir=batch_dir,
+                    iteration=iteration,
+                ))
+            except Exception:
+                if not self.settings.get("execution", {}).get(
+                    "continue_on_experiment_error", False
+                ):
+                    raise
+        return results
+
     def run_all(
         self,
         dry_run: bool = False,
@@ -188,7 +222,7 @@ class ExperimentManager:
         )
         for path in configs:
             try:
-                results.append(self.run_config(
+                results.extend(self.run_experiments(
                     path,
                     dry_run=dry_run,
                     batch_dir=batch_dir,
@@ -471,7 +505,7 @@ def main() -> int:
                 directory=target,
             )
         elif target.is_file() and target.suffix.lower() == ".json":
-            outputs = [manager.run_config(target, dry_run=args.dry_run)]
+            outputs = manager.run_experiments(target, dry_run=args.dry_run)
         else:
             parser.error(
                 f"Expected an existing JSON file or folder: {target}"

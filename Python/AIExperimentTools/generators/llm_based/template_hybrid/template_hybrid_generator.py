@@ -1,12 +1,16 @@
 import json
 import logging
 import random
+from pathlib import Path
 from time import monotonic
 
 from candidate import Candidate
-from generators.llm_map_creator.grok_client import GrokMapCreator
-from generators.llm_map_creator.map_processing import parse_response
-from generators.llm_map_creator.template_maps import (
+from map_schema.canonical_map import CanonicalMap
+from generators.llm_based.grok_client import GrokMapCreator
+from generators.llm_based.template_hybrid.prompts import build_prompt
+from generators.llm_based.schemas import DirectCanonicalMapResponse
+from generators.llm_based.response_parser import parse_response
+from generators.llm_based.template_hybrid.template_maps import (
     MODULE_SIZE,
     assemble_templates,
     validate_template,
@@ -23,6 +27,7 @@ def run(session):
     template_count = settings.get("template_count", 8)
     maps_per_epoch = settings.get("maps_per_epoch", 10)
     max_attempts = settings.get("max_attempts_per_template", 2)
+    room_count = settings.get("room_count")
 
     for name, value in (
             ("template_count", template_count),
@@ -36,20 +41,30 @@ def run(session):
         if type(value) is not int or value < MODULE_SIZE or value % MODULE_SIZE:
             raise ValueError(f"{name} must be a positive multiple of 16")
 
+    total_rooms = (width // MODULE_SIZE) * (height // MODULE_SIZE)
+    if room_count is not None and (
+        type(room_count) is not int or not 1 <= room_count <= total_rooms
+    ):
+        raise ValueError(f"room_count must be an integer from 1 to {total_rooms}")
+
     if settings["map_completion"]["mode"] != "generic":
         raise ValueError("template_hybrid requires generic map completion")
 
     rules_text = str(settings.get(
         "template_rules_text",
-        "Create a room with useful interior obstacles and multiple routes "
-        "between its four doorways.",
+        "Create a new room with useful interior obstacles and one to four "
+        "centered doorways. Use the supplied parts as examples, without copying them.",
     )).strip()
     if not rules_text:
         raise ValueError("template_rules_text must not be empty")
 
-    templates = _prepare_templates(
-        session, template_count, max_attempts, rules_text
-    )
+    pool_path = settings.get("template_pool_path")
+    if pool_path is not None:
+        templates = _load_templates(session, pool_path)
+    else:
+        templates = _prepare_templates(
+            session, template_count, max_attempts, rules_text
+        )
     rng = random.Random(session.seed)
     all_map_ids = []
     epoch = 0
@@ -72,10 +87,14 @@ def run(session):
                     map_id=f"hybrid_e{epoch:04d}_i{index:04d}",
                     width=width,
                     height=height,
+                    room_count=room_count,
                 )
                 canonical_map = canonical_map.replace_grid(
                     canonical_map.grid,
-                    {"assembly_time_seconds": monotonic() - started},
+                    {
+                        "assembly_time_seconds": monotonic() - started,
+                        "template_source": "saved_pool" if pool_path is not None else "llm",
+                    },
                 )
                 candidate = Candidate(canonical_map=canonical_map)
                 session.evaluate_candidates([candidate], epoch=epoch)
@@ -99,18 +118,71 @@ def run(session):
         epoch += 1
 
 
+def _read_templates(session, pool_path):
+    if not isinstance(pool_path, str) or not pool_path.strip():
+        raise ValueError("Template library path must be nonempty")
+    path = Path(pool_path)
+    if not path.is_absolute():
+        path = session.framework_root / path
+    path = path.resolve()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    # Also accept older saved pools containing canonical map objects.
+    if isinstance(payload, dict):
+        payload = payload.get("templates")
+    if not isinstance(payload, list) or not payload:
+        raise ValueError("Template library must be a nonempty JSON list of map parts")
+    templates = []
+    for index, item in enumerate(payload):
+        if isinstance(item, dict):
+            template = CanonicalMap.from_dict(item)
+        elif isinstance(item, list) and all(isinstance(row, str) for row in item):
+            template = CanonicalMap(
+                map_id=f"example_{index:04d}", width=MODULE_SIZE,
+                height=MODULE_SIZE, grid=tuple(item),
+            )
+        else:
+            raise ValueError(f"Map part {index} must be a list of grid rows")
+        validate_template(template, require_connected_interior=True)
+        if not any(template.grid == other.grid for other in templates):
+            templates.append(template)
+    return templates
+
+
+def _load_templates(session, pool_path):
+    started = monotonic()
+    templates = _read_templates(session, pool_path)
+    _write_json(session.output_dir / "_raw" / "template_pool.json",
+                [list(template.grid) for template in templates])
+    _write_json(session.output_dir / "template_generation.json", {
+        "generator": "template_hybrid",
+        "source": "saved_pool",
+        "source_pool": str(pool_path),
+        "requested_template_count": 0,
+        "started_request_count": 0,
+        "generated_template_count": 0,
+        "loaded_template_count": len(templates),
+        "accepted_template_count": len(templates),
+        "preparation_seconds": monotonic() - started,
+        "requests": [],
+    })
+    return templates
+
+
 def _prepare_templates(session, count, max_attempts, rules_text):
     from openai import APIError
 
     creator = GrokMapCreator(
         dict(session.generator_settings.get("grok", {})),
-        template_mode=True,
     )
     validation_settings = {
         "minimum_spawn_count": 0,
         "require_single_connected_region": True,
     }
-    templates = []
+    examples_path = session.generator_settings.get(
+        "template_examples_path", "configs/examples/map_parts/initial_parts.json"
+    )
+    templates = _read_templates(session, examples_path)
+    example_count = len(templates)
     requests = []
     generated_count = 0
     preparation_started = monotonic()
@@ -138,17 +210,23 @@ def _prepare_templates(session, count, max_attempts, rules_text):
 
             try:
                 response_result = creator.create_map(
-                    rules_text=rules_text,
-                    map_id=request_id,
-                    map_index=index,
-                    map_count=count,
-                    width=MODULE_SIZE,
-                    height=MODULE_SIZE,
-                    seed=session.seed + index,
-                    validation=validation_settings,
-                    examples=[],
-                    attempt=attempt,
-                    feedback=feedback,
+                    rules_text=build_prompt(
+                        template=True, layout_only=True,
+                        rules_text=rules_text,
+                        map_id=request_id,
+                        map_index=index,
+                        map_count=count,
+                        width=MODULE_SIZE,
+                        height=MODULE_SIZE,
+                        seed=session.seed + index,
+                        validation=validation_settings,
+                        examples=[list(template.grid) for template in templates],
+                        attempt=attempt,
+                        feedback=feedback,
+                    ),
+                    map_id=request_id, width=MODULE_SIZE, height=MODULE_SIZE, attempt=attempt,
+                    raw_output_dir=session.output_dir / "_raw" / "llm",
+                    response_format=DirectCanonicalMapResponse,
                 )
                 response_payload = response_result.response.model_dump(mode="json")
                 canonical_map = parse_response(
@@ -168,7 +246,9 @@ def _prepare_templates(session, count, max_attempts, rules_text):
                     },
                 )
                 generated_count += 1
-                validate_template(canonical_map)
+                validate_template(canonical_map, require_connected_interior=True)
+                if any(canonical_map.grid == template.grid for template in templates):
+                    raise ValueError("This part already exists in the library; create a different layout")
 
             except APIError as exc:
                 provider_error = {
@@ -244,7 +324,9 @@ def _prepare_templates(session, count, max_attempts, rules_text):
                 bool(item["attempts"]) for item in requests
             ),
             "generated_template_count": generated_count,
-            "accepted_template_count": len(templates),
+            "example_template_count": example_count,
+            "accepted_template_count": len(templates) - example_count,
+            "library_template_count": len(templates),
             "preparation_seconds": monotonic() - preparation_started,
             "rules_text": rules_text,
             "requests": requests,
@@ -252,7 +334,7 @@ def _prepare_templates(session, count, max_attempts, rules_text):
         )
     _write_json(
         session.output_dir / "_raw" / "template_pool.json",
-        {"templates": [template.to_dict() for template in templates]},
+        [list(template.grid) for template in templates],
         )
     return templates
 

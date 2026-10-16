@@ -6,9 +6,14 @@ from pathlib import Path
 from map_schema.canonical_map import CanonicalMap
 
 
-def save_canonical_map(canonical_map: CanonicalMap, path: Path) -> Path:
+def save_canonical_map(
+    canonical_map: CanonicalMap, path: Path, *, valid: bool | None = None,
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(canonical_map.to_dict(), indent=2), encoding="utf-8")
+    payload = canonical_map.to_dict()
+    if valid is not None:
+        payload["valid"] = bool(valid)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
 
 

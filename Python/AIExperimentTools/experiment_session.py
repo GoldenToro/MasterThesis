@@ -499,6 +499,7 @@ class ExperimentSession:
         save_canonical_map(
             canonical_map,
             epoch_dir / f"{canonical_map.map_id}.map.json",
+            valid=validation.valid,
         )
 
         epoch, numeric_id = self._map_sort_key(canonical_map)

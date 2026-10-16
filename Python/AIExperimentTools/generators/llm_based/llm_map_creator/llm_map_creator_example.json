@@ -10,7 +10,7 @@
     "max_attempts_per_map": 2,
     "max_prompt_examples": 1,
     "example_map_paths": [
-      "generators/llm_map_creator/example_generated_maps.json"
+      "generators/llm_based/llm_map_creator/example_generated_maps.json"
     ],
     "grok": {
       "model": "grok-4.5",

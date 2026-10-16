@@ -23,27 +23,27 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "run",
     ),
     "random_digger": (
-        "generators.constructive.random_digger_generator",
+        "generators.constructive.random_digger.random_digger_generator",
         "run",
     ),
     "cellular_automata": (
-        "generators.constructive.cellular_automata_generator",
+        "generators.constructive.cellular_automata.cellular_automata_generator",
         "run",
     ),
     "divisive": (
-        "generators.constructive.divisive_generator",
+        "generators.constructive.divisive.divisive_generator",
         "run",
     ),
     "grid_graph": (
-        "generators.constructive.grid_graph_generator",
+        "generators.constructive.grid_graph.grid_graph_generator",
         "run",
     ),
     "fps_pattern": (
-        "generators.constructive.fps_pattern_generator",
+        "generators.constructive.fps_pattern.fps_pattern_generator",
         "run",
     ),
     "all_black": (
-        "generators.constructive.all_black_generator",
+        "generators.constructive.all_black.all_black_generator",
         "run",
     ),
     "map_elites": (

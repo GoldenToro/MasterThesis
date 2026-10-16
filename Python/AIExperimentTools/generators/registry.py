@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from experiment_session import ExperimentSession
 
-
 GeneratorRunner = Callable[["ExperimentSession"], list[str]]
-
 
 _GENERATORS: dict[str, tuple[str, str]] = {
     "manual": (
@@ -17,11 +15,11 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "run",
     ),
     "llm_map_creator": (
-        "generators.llm_map_creator.llm_map_creator",
+        "generators.llm_based.llm_map_creator.llm_map_creator",
         "run",
     ),
     "nsga2": (
-        "generators.nsga2.nsga2_generator",
+        "generators.search_based.nsga2.nsga2_generator",
         "run",
     ),
     "random_digger": (
@@ -49,11 +47,11 @@ _GENERATORS: dict[str, tuple[str, str]] = {
         "run",
     ),
     "map_elites": (
-        "generators.map_elites.map_elites_generator",
+        "generators.search_based.map_elites.map_elites_generator",
         "run",
     ),
     "template_hybrid": (
-        "generators.llm_map_creator.template_hybrid_generator",
+        "generators.llm_based.template_hybrid.template_hybrid_generator",
         "run",
     ),
 }

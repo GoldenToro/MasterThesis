@@ -1,6 +1,6 @@
-from internals.area import Area, scale_area
-from internals.phenotype import Phenotype
-from internals.graph_genome.room import Room
+from ..area import Area, scale_area
+from ..phenotype import Phenotype
+from .room import Room
 
 GG_SQUARE_SIZE = 3
 GG_MAP_SCALE = 2

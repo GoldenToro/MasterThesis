@@ -1,0 +1,1 @@
+"""Search-based map generators."""

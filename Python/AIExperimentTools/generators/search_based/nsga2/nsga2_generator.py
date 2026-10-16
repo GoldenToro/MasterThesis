@@ -22,15 +22,15 @@ def run(base_generator: ExperimentSession) -> list[str]:
             "'python -m pip install -r requirements.txt'."
         ) from exc
 
-    from generators.nsga2.internals.ab_genome.ab_genome import (
+    from generators.search_based.nsga2.internals.ab_genome.ab_genome import (
         ABGenome,
         AB_MAX_MAP_WIDTH,
         AB_MAX_MAP_HEIGHT,
         AB_SQUARE_SIZE,
     )
-    from generators.nsga2.internals.ab_genome.crossover import crossover
-    from generators.nsga2.internals.ab_genome.generation import create_random_genome
-    from generators.nsga2.internals.ab_genome.mutation import mutate
+    from generators.search_based.nsga2.internals.ab_genome.crossover import crossover
+    from generators.search_based.nsga2.internals.ab_genome.generation import create_random_genome
+    from generators.search_based.nsga2.internals.ab_genome.mutation import mutate
 
     settings = base_generator.generator_settings
     supported_size = (

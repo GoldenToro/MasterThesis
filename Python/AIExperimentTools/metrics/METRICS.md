@@ -127,11 +127,6 @@ Missing raw Unity log files now produce an unavailable value rather than a misle
     "spawn_death_radius_tiles": 3.0,
     "expressive_range_metrics": ["walkable_area_ratio", "pace"],
     "expressive_range_bins": 10,
-    "overall_generator_score_weights": {
-      "quality": 0.5,
-      "success_rate": 0.3,
-      "diversity": 0.2
-    }
   },
   "generator_settings": {
     "control_targets": {

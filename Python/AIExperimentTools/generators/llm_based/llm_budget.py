@@ -10,13 +10,23 @@ from threading import Lock
 
 
 _LOCK = Lock()
+INPUT_USD_PER_MILLION = 4
+OUTPUT_USD_PER_MILLION = 12
+
+
+def estimate_cost_usd(usage):
+    """Conservative estimate using this budget's rates, not an invoice total."""
+    values = [usage.get("input_tokens"), usage.get("output_tokens")]
+    if any(type(value) is not int or value < 0 for value in values):
+        return None
+    return (values[0] * INPUT_USD_PER_MILLION + values[1] * OUTPUT_USD_PER_MILLION) / 1_000_000
 
 
 class LLMBudgetExceeded(RuntimeError):
     """No provider call was made because the shared budget cannot admit it."""
 
 
-def reserve_request(settings, model, base_url, request):
+def reserve_request(settings, model, base_url, request, run_id=None):
     path_value = settings.get("llm_budget_path")
     if path_value is None:
         if "llm_budget_usd" in settings or "llm_max_requests" in settings:
@@ -40,12 +50,12 @@ def reserve_request(settings, model, base_url, request):
     # space for message framing and provider schema handling. No tools or media.
     payload = {
         "input": request["input"],
-        "schema": request["text_format"].model_json_schema(),
+        "schema": request["text_format"].model_json_schema() if request.get("text_format") else None,
     }
     input_bound = len(json.dumps(payload, ensure_ascii=True).encode("utf-8")) + 4096
     # Long-context grok-4.5 rates: $4/M input and $12/M output (including reasoning).
     # https://docs.x.ai/developers/models/grok-4.5
-    reserve_micro_usd = input_bound * 4 + output_limit * 12
+    reserve_micro_usd = input_bound * INPUT_USD_PER_MILLION + output_limit * OUTPUT_USD_PER_MILLION
     path = Path(path_value).expanduser().resolve()
 
     with _locked_ledger(path):
@@ -74,6 +84,7 @@ def reserve_request(settings, model, base_url, request):
         index = len(reservations)
         reservations.append({
             "request_number": index + 1,
+            "run_id": run_id,
             "reserved_at": datetime.now(timezone.utc).isoformat(),
             "reserved_micro_usd": reserve_micro_usd,
             "input_token_bound": input_bound,

@@ -845,73 +845,97 @@ def _controllability_score(context: MetricContext) -> float | None:
             scores.append(max(0.0, 1.0 - error / float(tolerance)))
     return mean(scores) if scores else None
 
+def _layout_variants(canonical_map):
+    grid = tuple(
+        tuple(cell == WALL for cell in row)
+        for row in canonical_map.grid
+    )
+    variants = set()
+    for _ in range(4):
+        variants.add(grid)
+        variants.add(tuple(tuple(reversed(row)) for row in grid))
+        grid = tuple(zip(*reversed(grid)))
+    return variants
 
-def _population_map_diversity(context: PopulationMetricContext) -> float | None:
-    """Mean pairwise wall/floor Hamming distance inside the population.
-
-    Duplicate population members are preserved and contribute a distance of zero,
-    which correctly lowers diversity when the population contains clones.
-    """
-
-    maps = [item.canonical_map for item in context.population_contexts if item.canonical_map is not None]
-    if len(maps) == 0:
+def _population_map_diversity(context):
+    maps = [item.canonical_map for item in context.population_contexts]
+    if not maps or any(item is None for item in maps):
         return None
     if len(maps) == 1:
         return 0.0
-    distances: list[float] = []
+
+    variants = [_layout_variants(item) for item in maps]
+    distances = []
+
     for index, first in enumerate(maps[:-1]):
-        for second in maps[index + 1:]:
-            if first.width != second.width or first.height != second.height:
-                continue
-            differences = sum(
-                (left == WALL) != (right == WALL)
-                for first_row, second_row in zip(first.grid, second.grid)
-                for left, right in zip(first_row, second_row)
-            )
-            distances.append(differences / (first.width * first.height))
-    return mean(distances) if distances else None
+        grid = tuple(
+            tuple(cell == WALL for cell in row)
+            for row in first.grid
+        )
+        for candidates in variants[index + 1:]:
+            matching = [
+                other for other in candidates
+                if len(other) == first.height
+                   and len(other[0]) == first.width
+            ]
+            if not matching:
+                return None
+
+            distances.append(min(
+                sum(
+                    a != b
+                    for row_a, row_b in zip(grid, other)
+                    for a, b in zip(row_a, row_b)
+                ) / (first.width * first.height)
+                for other in matching
+            ))
+
+    return mean(distances)
 
 
-def _population_expressive_range(context: PopulationMetricContext) -> float | None:
+def _population_expressive_range(context):
     settings = context.experiment.get("analysis_settings", {})
-    dimensions = [
-        normalize_metric_name(value)
-        for value in settings.get(
-            "expressive_range_metrics",
-            ["walkable_area_ratio", "pace"],
-        )
-    ]
-    if len(dimensions) != 2 or any(name not in MAP_NUMERIC_METRIC_NAMES for name in dimensions):
-        return None
+    dimensions = settings.get(
+        "expressive_range_metrics",
+        ["walkable_area_ratio", "max_symmetry"],
+    )
+    bounds = settings.get("expressive_range_bounds", {
+        "walkable_area_ratio": [0, 1],
+        "max_symmetry": [0, 1],
+    })
+    bins = settings.get("expressive_range_bins", 10)
 
-    points: list[tuple[float, float]] = []
+    if len(dimensions) != 2 or any(
+            name not in MAP_NUMERIC_METRIC_NAMES for name in dimensions
+    ):
+        raise ValueError("Expressive range needs two numeric map metrics")
+    if type(bins) is not int or bins < 1:
+        raise ValueError("expressive_range_bins must be positive")
+
+    limits = [bounds[name] for name in dimensions]
+    for low, high in limits:
+        if not _is_number(low) or not _is_number(high) or low >= high:
+            raise ValueError(
+                "Expressive range needs finite lower < upper bounds"
+            )
+
+    occupied = set()
     for item in context.population_contexts:
-        first = calculate_metrics(item.match_records, [dimensions[0]], item).get(dimensions[0])
-        second = calculate_metrics(item.match_records, [dimensions[1]], item).get(dimensions[1])
-        if _is_number(first) and _is_number(second):
-            points.append((float(first), float(second)))
-    if len(points) == 0:
-        return None
-    if len(points) == 1:
-        return 0.0
+        values = calculate_metrics(item.match_records, dimensions, item)
+        point = [values[name] for name in dimensions]
 
-    first_values = [point[0] for point in points]
-    second_values = [point[1] for point in points]
-    first_range = max(first_values) - min(first_values)
-    second_range = max(second_values) - min(second_values)
-    if first_range == 0 or second_range == 0:
-        return 0.0
+        if any(
+                not _is_number(value) or not low <= value <= high
+                for value, (low, high) in zip(point, limits)
+        ):
+            return None
 
-    bins = max(1, int(settings.get("expressive_range_bins", 10)))
-    occupied = {
-        (
-            min(bins - 1, int((first - min(first_values)) / first_range * bins)),
-            min(bins - 1, int((second - min(second_values)) / second_range * bins)),
-        )
-        for first, second in points
-    }
-    return len(occupied) / (bins * bins)
+        occupied.add(tuple(
+            min(bins - 1, int((value - low) / (high - low) * bins))
+            for value, (low, high) in zip(point, limits)
+        ))
 
+    return len(occupied) / bins**2 if occupied else None
 
 def _population_counts(context: PopulationMetricContext) -> tuple[int, int, int]:
     records = [item.record for item in context.evaluated_contexts]
@@ -924,44 +948,23 @@ def _population_generator_success_rate(context: PopulationMetricContext) -> floa
     generated, valid, _ = _population_counts(context)
     return valid / generated if generated else None
 
-
-def _population_generator_efficiency(context: PopulationMetricContext) -> float | None:
-    times = [_generation_time(item) for item in context.evaluated_contexts]
-    available = [value for value in times if value is not None]
-    if len(available) == 0 or len(available) != len(context.evaluated_contexts):
-        return None
-    total_time = sum(available)
-    if total_time <= 0:
-        return None
-    valid = sum(bool(item.record.get("valid")) for item in context.evaluated_contexts)
-    return valid / total_time
-
-
-def _population_overall_generator_score(context: PopulationMetricContext) -> float | None:
-    qualities = [_overall_map_quality(item) for item in context.population_contexts]
-    available_qualities = [value for value in qualities if value is not None]
-    if len(available_qualities) == 0:
+def _lower_is_better(value, bounds):
+    if bounds is None:
         return None
 
-    quality = mean(available_qualities)
-    success = _population_generator_success_rate(context)
-    diversity = _population_map_diversity(context)
-    weights = context.experiment.get("analysis_settings", {}).get(
-        "overall_generator_score_weights",
-        {"quality": 0.5, "success_rate": 0.3, "diversity": 0.2},
-    )
-    quality_weight = float(weights.get("quality", 0.5))
-    success_weight = float(weights.get("success_rate", 0.3))
-    diversity_weight = float(weights.get("diversity", 0.2))
-    total = quality_weight + success_weight + diversity_weight
-    if total <= 0:
+    low, high = bounds
+    if not _is_number(low) or not _is_number(high) or not 0 <= low < high:
+        raise ValueError("Score bounds require finite 0 <= lower < upper")
+    if value is None:
         return None
-    return (
-        quality_weight * quality
-        + success_weight * (success if success is not None else 0.0)
-        + diversity_weight * (diversity if diversity is not None else 0.0)
-    ) / total
 
+    return max(0.0, min(1.0, (high - value) / (high - low)))
+
+def _population_generator_efficiency(context):
+    seconds = context.generation_time_seconds
+    if seconds is None or seconds <= 0:
+        return None
+    return len(context.population_contexts) / seconds
 
 def _population_generated_map_count(context: PopulationMetricContext) -> int:
     return _population_counts(context)[0]
@@ -1134,7 +1137,6 @@ _POPULATION_METRIC_FUNCTIONS: dict[str, Callable[[PopulationMetricContext], Metr
     "expressive_range": _population_expressive_range,
     "generator_success_rate": _population_generator_success_rate,
     "generator_efficiency": _population_generator_efficiency,
-    "overall_generator_score": _population_overall_generator_score,
     "generated_map_count": _population_generated_map_count,
     "valid_map_count": _population_valid_map_count,
     "invalid_map_count": _population_invalid_map_count,

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
+from generators.llm_based.llm_budget import reserve_request, finish_request
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,13 @@ class GrokMapCreator:
         if reasoning_effort is not None:
             request["reasoning"] = {"effort": str(reasoning_effort)}
 
+        reservation = None
         try:
+            reservation = reserve_request(
+                self.settings, self.model, self.base_url,
+                {**request, "text_format": response_format},
+                run_id=str(raw_output_dir.parent.parent.resolve()) if raw_output_dir else None,
+            )
             if response_format is not None:
                 api_response = client.responses.parse(
                     **request, text_format=response_format,
@@ -111,10 +118,16 @@ class GrokMapCreator:
             else:
                 api_response = client.responses.create(**request)
         except AttributeError as exc:
+            finish_request(reservation, error=type(exc).__name__)
             raise RuntimeError(
                 "The installed OpenAI SDK lacks responses.parse. Upgrade packages "
                 "from requirements.txt."
             ) from exc
+        except Exception as exc:
+            finish_request(reservation, error=type(exc).__name__)
+            raise
+        else:
+            finish_request(reservation, usage=self._model_dump(getattr(api_response, "usage", None)))
         finally:
             client.close()
 

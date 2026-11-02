@@ -74,6 +74,7 @@ def run(session):
 
     while True:
         evaluated_count = 0
+        candidates = []
 
         if templates:
             for index in range(maps_per_epoch):
@@ -97,9 +98,12 @@ def run(session):
                     },
                 )
                 candidate = Candidate(canonical_map=canonical_map)
-                session.evaluate_candidates([candidate], epoch=epoch)
+                candidates.append(candidate)
                 all_map_ids.append(candidate.map_id)
                 evaluated_count += 1
+
+        if candidates:
+            session.evaluate_candidates(candidates, epoch=epoch)
 
         _write_json(
             session.output_dir / f"epoch_{epoch:04d}" / "checkpoint_summary.json",

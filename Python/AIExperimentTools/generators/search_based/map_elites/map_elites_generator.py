@@ -61,7 +61,8 @@ def run(session):
 
     while True:
         count = initial_candidates if epoch == 0 else candidates_per_epoch
-        evaluated_count = 0
+        candidates = []
+        parents = archive.candidates()
 
         for index in range(count):
             if session.production_time_expired():
@@ -70,7 +71,6 @@ def run(session):
             if epoch == 0:
                 genome = create_random_genome(ABGenome)
             else:
-                parents = archive.candidates()
                 genome = copy.deepcopy(random.choice(parents).genome)
 
                 if random.random() < mate_probability:
@@ -84,9 +84,10 @@ def run(session):
                 canonical_map=_create_map(genome, epoch, index),
                 genome=genome,
             )
-            session.evaluate_candidates([candidate], epoch=epoch)
-            evaluated_count += 1
+            candidates.append(candidate)
 
+        session.evaluate_candidates(candidates, epoch=epoch)
+        for candidate in candidates:
             evaluation = candidate.evaluation
             if evaluation is None:
                 raise RuntimeError(f"Missing evaluation for {candidate.map_id}")
@@ -128,7 +129,7 @@ def run(session):
             "epoch": epoch,
             "population_size": len(map_ids),
             "selected_map_ids": map_ids,
-            "evaluated_candidate_count": evaluated_count,
+            "evaluated_candidate_count": len(candidates),
             "source": "map_elites",
         }
         (directory / "checkpoint_summary.json").write_text(

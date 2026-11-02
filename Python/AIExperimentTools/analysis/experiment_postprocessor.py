@@ -6,7 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from analysis.run_analysis import RunAnalysis, GENERATION_MAP_METRICS, FINAL_POPULATION_METRICS
+from analysis.run_analysis import (
+    RunAnalysis, GENERATION_MAP_METRICS, FINAL_POPULATION_METRICS,
+    RUN_POPULATION_METRICS,
+)
 
 from analysis.plots import (
     create_epoch_line_diagram,
@@ -27,8 +30,8 @@ from metrics.metric_calculator import (
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
-class ExperimentAnalyzer:
-    """Post-process one completed experiment before the next JSON starts."""
+class ExperimentPostprocessor:
+    """Post-process one completed run before the next JSON starts."""
 
     def __init__(self, run_dir: Path, experiment: dict[str, Any]):
         self.analysis = RunAnalysis(run_dir, experiment)
@@ -107,8 +110,8 @@ class ExperimentAnalyzer:
         ]
         history_population_metrics = [
             name for name in requested_population_metrics
-            if name in generator_population_metrics
-            or name in diagram_names
+            if name not in RUN_POPULATION_METRICS
+            and (name in generator_population_metrics or name in diagram_names)
         ]
 
         epoch_views = self.analysis.epoch_views(contexts)

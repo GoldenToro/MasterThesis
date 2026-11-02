@@ -1,5 +1,5 @@
 """Post-experiment metric enrichment and diagrams."""
 
-from analysis.experiment_analyzer import ExperimentAnalyzer
+from analysis.experiment_postprocessor import ExperimentPostprocessor
 
-__all__ = ["ExperimentAnalyzer"]
+__all__ = ["ExperimentPostprocessor"]

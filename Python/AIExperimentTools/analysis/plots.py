@@ -22,6 +22,9 @@ def create_epoch_line_diagram(
     """
 
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         return None
@@ -102,6 +105,9 @@ def create_epoch_summary_line_diagram(
     """Create a line graph for one population-level value per epoch."""
 
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         return None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
@@ -15,15 +16,39 @@ from map_schema.canonical_map import CanonicalMap
 LOGGER = logging.getLogger("FPS-EVALUATOR")
 
 
+def get_bot_matches(settings: dict[str, Any]) -> dict[str, Any]:
+    """Read named bot pairs, accepting older single-pair configurations."""
+    pairs = settings.get("bot_matches")
+    if "bot_matches" not in settings:
+        pairs = {"1": {name: settings.get(name) for name in ("bot1", "bot2")}}
+    if not isinstance(pairs, dict) or not pairs:
+        raise ValueError("bot_matches must be a non-empty object")
+    for match_id, pair in pairs.items():
+        if not isinstance(match_id, str) or not match_id.strip() or not isinstance(pair, dict):
+            raise ValueError("Each bot_matches entry requires a non-empty ID and a bot pair")
+        for name in ("bot1", "bot2"):
+            bot = pair.get(name)
+            if not isinstance(bot, dict) or not {"file", "skill"}.issubset(bot):
+                raise ValueError(f"bot_matches.{match_id}.{name} requires file and skill")
+            if not isinstance(bot["file"], str) or not bot["file"].strip():
+                raise ValueError(f"bot_matches.{match_id}.{name}.file must be non-empty")
+            skill = bot["skill"]
+            if type(skill) not in (int, float) or not math.isfinite(skill) or not 0 <= skill <= 1:
+                raise ValueError(f"bot_matches.{match_id}.{name}.skill must be between 0 and 1")
+    return pairs
+
+
 def _read_final_results(
         path: Path,
         expected_count: int,
+        bot_match_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    if expected_count != 2:
+    if expected_count <= 0 or expected_count % 2:
         raise ValueError(
-            "A Unity simulation must contain exactly two assignment matches."
+            "A Unity simulation must contain a positive even number of assignment matches."
         )
 
+    total_count = expected_count * (len(bot_match_ids) if bot_match_ids is not None else 1)
     data = json.loads(path.read_text(encoding="utf-8"))
 
     if isinstance(data, dict):
@@ -32,10 +57,10 @@ def _read_final_results(
     if (
             not isinstance(data, list)
             or not data
-            or len(data) != expected_count
+            or len(data) != total_count
     ):
         raise ValueError(
-            f"Expected {expected_count} Unity match results in {path}"
+            f"Expected {total_count} Unity match results in {path}"
         )
 
     for match_index, record in enumerate(data):
@@ -43,6 +68,14 @@ def _read_final_results(
             raise ValueError(
                 f"Invalid Unity result for match {match_index} in {path}"
             )
+
+        if bot_match_ids is not None:
+            match_id = bot_match_ids[match_index // expected_count]
+            if record.get("bot_match_id") != match_id:
+                raise ValueError(
+                    f"Expected bot_match_id '{match_id}' for match {match_index}. "
+                    "Rebuild Unity with bot_matches support."
+                )
 
         for key in ("numberOfFrags1", "numberOfFrags2"):
             value = record.get(key)
@@ -53,14 +86,14 @@ def _read_final_results(
                 )
 
         for key, expected in (
-            ("initial_spawn_index_bot1", match_index),
-            ("initial_spawn_index_bot2", 1 - match_index),
+            ("initial_spawn_index_bot1", match_index % 2),
+            ("initial_spawn_index_bot2", 1 - match_index % 2),
         ):
             value = record.get(key)
             if type(value) is not int or value != expected:
                 raise ValueError(
                     f"Missing or incorrect {key} for match {match_index} in {path}. "
-                    "Expected a complete pair from the updated Unity build."
+                    "Expected alternating spawn assignments from the Unity build."
                 )
 
     return data
@@ -134,10 +167,10 @@ class UnityRunner:
         matches_per_simulation = int(
             simulator_settings.get("matches_per_simulation", 2)
         )
-        if matches_per_simulation != 2:
+        if matches_per_simulation <= 0 or matches_per_simulation % 2:
             raise ValueError(
-                "matches_per_simulation must be 2: "
-                "one match for each initial spawn assignment"
+                "matches_per_simulation must be a positive even number: "
+                "equal matches for each initial spawn assignment"
             )
         execution = self.settings.get("execution", {})
         configured_workers = int(
@@ -250,6 +283,7 @@ class UnityRunner:
 
         try:
             self._copy_bots(bot_dir)
+            bot_matches = get_bot_matches(simulator_settings)
             map_payload = canonical_map.to_dict()
             map_payload["map_scale"] = float(
                 canonical_map.metadata.get(
@@ -299,15 +333,12 @@ class UnityRunner:
                     ),
                 },
                 "map": map_payload,
-                "bot1": {
-                    "id": 1,
-                    "file": str(simulator_settings["bot1"]["file"]),
-                    "skill": float(simulator_settings["bot1"]["skill"]),
-                },
-                "bot2": {
-                    "id": 2,
-                    "file": str(simulator_settings["bot2"]["file"]),
-                    "skill": float(simulator_settings["bot2"]["skill"]),
+                "bot_matches": {
+                    match_id: {
+                        name: {"id": index, "file": pair[name]["file"], "skill": pair[name]["skill"]}
+                        for index, name in enumerate(("bot1", "bot2"), start=1)
+                    }
+                    for match_id, pair in sorted(bot_matches.items())
                 },
             }
             config_file = runtime_root / "map_test_config.json"
@@ -378,6 +409,7 @@ class UnityRunner:
             match_records = _read_final_results(
                 final_results,
                 matches_per_simulation,
+                sorted(bot_matches),
             )
             for match_index, record in enumerate(match_records):
                 record["simulation_index"] = simulation_index

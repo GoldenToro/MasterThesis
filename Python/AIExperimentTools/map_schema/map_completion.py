@@ -32,9 +32,17 @@ def complete_map(
             f"Placement needs {required} floor cells; found {len(floor)}"
         )
 
-    rng = random.Random(seed)
-    first = rng.choice(floor)
     floor_set = set(floor)
+    spawn_cells = [
+        (x, y) for x, y in floor
+        if all((x + dx, y + dy) in floor_set
+               for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+    ]
+    if len(spawn_cells) < 2:
+        raise ValueError("Placement needs two spawn cells with clearance from walls")
+
+    rng = random.Random(seed)
+    first = rng.choice(spawn_cells)
     distances = {first: 0}
     queue = deque([first])
 
@@ -48,9 +56,9 @@ def complete_map(
     if len(distances) != len(floor):
         raise ValueError("Generic placement requires one connected floor region")
 
-    furthest_distance = max(distances.values())
+    furthest_distance = max(distances[point] for point in spawn_cells)
     second = rng.choice([
-        point for point in floor
+        point for point in spawn_cells
         if distances[point] == furthest_distance
     ])
 

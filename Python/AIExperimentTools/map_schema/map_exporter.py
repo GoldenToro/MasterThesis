@@ -22,6 +22,20 @@ def load_canonical_map(path: Path) -> CanonicalMap:
     return CanonicalMap.from_dict(data)
 
 
+def load_saved_map(epoch_dir: Path, map_id: str) -> CanonicalMap | None:
+    """Read a canonical map, including from a cleaned-up run's Unity export."""
+    map_path = epoch_dir / f"{map_id}.map.json"
+    if map_path.is_file():
+        return load_canonical_map(map_path)
+    unity_path = epoch_dir / f"{map_id}.unity.json"
+    if unity_path.is_file():
+        payload = json.loads(unity_path.read_text(encoding="utf-8"))
+        map_payload = payload.get("map")
+        if isinstance(map_payload, dict):
+            return CanonicalMap.from_dict(map_payload)
+    return None
+
+
 def save_grid_text(canonical_map: CanonicalMap, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(canonical_map.grid) + "\n", encoding="utf-8")

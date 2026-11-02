@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import math
 from collections import Counter, deque
@@ -8,6 +9,7 @@ from pathlib import Path
 from statistics import mean, pstdev
 from typing import Any, Callable
 
+from generators.registry import available_generators, generator_family
 from map_schema.canonical_map import (
     AMMO,
     FLOOR,
@@ -102,8 +104,8 @@ class PopulationMetricContext:
     population_contexts: list[MetricContext] = field(default_factory=list)
     evaluated_contexts: list[MetricContext] = field(default_factory=list)
     experiment: dict[str, Any] = field(default_factory=dict)
-
-
+    run_dir: Path | None = None
+    whole_run: bool = False
 
 
 # Names exposed by analysis_settings.calculate_metric and calculate_all_metrics.
@@ -134,6 +136,7 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
     "closeness_centrality",
     "betweenness_centrality",
     "chokepoint_count",
+    "chokepoint_ratio",
     "loop_count",
     "alternative_path_count",
     "average_visibility",
@@ -173,6 +176,7 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
     "kill_streak_max_bot_2",
     "entropy",
     "pace",
+    "zero_kill_match_frequency",
     "fight_time",
     "pursue_time",
     "sight_loss_rate",
@@ -191,12 +195,16 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
     "combat_distance_distribution",
     "spawn_death_rate",
     "map_diversity",
+    "unique_map_ratio",
     "expressive_range",
     "generator_success_rate",
+    "generator_reliability",
     "generator_efficiency",
+    "repair_rate",
+    "generation_time_per_output_map",
+    "generation_cost_per_output_map",
     "controllability_score",
     "overall_map_quality_score",
-    "overall_generator_score",
     "generated_map_count",
     "valid_map_count",
     "invalid_map_count",
@@ -212,10 +220,14 @@ ANALYSIS_METRIC_NAMES: tuple[str, ...] = (
 POPULATION_METRIC_NAMES = frozenset(
     {
         "map_diversity",
+        "unique_map_ratio",
         "expressive_range",
         "generator_success_rate",
+        "generator_reliability",
         "generator_efficiency",
-        "overall_generator_score",
+        "repair_rate",
+        "generation_time_per_output_map",
+        "generation_cost_per_output_map",
         "generated_map_count",
         "valid_map_count",
         "invalid_map_count",
@@ -570,6 +582,14 @@ def _chokepoint_count(context: MetricContext) -> int | None:
     return sum(1 for _ in nx.articulation_points(graph)) if graph.number_of_nodes() else None
 
 
+def _chokepoint_ratio(context: MetricContext) -> float | None:
+    walkable = _walkable_tile_count(context)
+    if not walkable:
+        return None
+    count = _chokepoint_count(context)
+    return count / walkable if count is not None else None
+
+
 def _loop_count(context: MetricContext) -> int | None:
     graph = _graph_bundle(context)["graph"]
     if graph.number_of_nodes() == 0:
@@ -659,6 +679,19 @@ def _spawn_escape_routes(context: MetricContext) -> float | None:
         )
         values.append(exits / 4.0)
     return mean(values) if values else None
+
+def _zero_kill_match_frequency(context: MetricContext) -> float | None:
+    if not context.match_records:
+        return None
+    zero_kill_matches = 0
+    for record in context.match_records:
+        kills = [record.get("numberOfFrags1"), record.get("numberOfFrags2")]
+        if any(not _is_number(value) or value < 0 or not float(value).is_integer()
+               for value in kills):
+            return None
+        zero_kill_matches += int(kills[0] == 0 and kills[1] == 0)
+    return zero_kill_matches / len(context.match_records)
+
 
 def _kill_difference(context: MetricContext) -> float | None:
     values = []
@@ -857,6 +890,15 @@ def _layout_variants(canonical_map):
         grid = tuple(zip(*reversed(grid)))
     return variants
 
+def _population_unique_map_ratio(context: PopulationMetricContext) -> float | None:
+    maps = [item.canonical_map for item in context.population_contexts]
+    if not maps or any(item is None for item in maps):
+        return None
+    # Match map_diversity: wall/floor layouts, ignoring rotation and reflection.
+    unique_layouts = {min(_layout_variants(item)) for item in maps}
+    return len(unique_layouts) / len(maps)
+
+
 def _population_map_diversity(context):
     maps = [item.canonical_map for item in context.population_contexts]
     if not maps or any(item is None for item in maps):
@@ -935,7 +977,8 @@ def _population_expressive_range(context):
             for value, (low, high) in zip(point, limits)
         ))
 
-    return len(occupied) / bins**2 if occupied else None
+    # Coverage relative to what this sample can occupy in the fixed grid.
+    return len(occupied) / min(len(context.population_contexts), bins**2) if occupied else None
 
 def _population_counts(context: PopulationMetricContext) -> tuple[int, int, int]:
     records = [item.record for item in context.evaluated_contexts]
@@ -948,23 +991,97 @@ def _population_generator_success_rate(context: PopulationMetricContext) -> floa
     generated, valid, _ = _population_counts(context)
     return valid / generated if generated else None
 
-def _lower_is_better(value, bounds):
-    if bounds is None:
-        return None
+def _repair_needed(context: MetricContext) -> bool | None:
+    actions = context.record.get("repair", {}).get("actions")
+    before = context.record.get("validation_before_repair", {})
+    attempt = _metadata_number(context, "llm_attempt")
+    # LLM attempts after the first correct or replace an invalid response.
+    # They indicate repair incidence, but are not deterministic repair actions.
+    if (isinstance(actions, list) and actions) or before.get("valid") is False or before.get("errors"):
+        return True
+    if attempt is not None and attempt > 1:
+        return True
+    if isinstance(actions, list) or before.get("valid") is True or attempt == 1:
+        return False
+    return None
 
-    low, high = bounds
-    if not _is_number(low) or not _is_number(high) or not 0 <= low < high:
-        raise ValueError("Score bounds require finite 0 <= lower < upper")
-    if value is None:
-        return None
 
-    return max(0.0, min(1.0, (high - value) / (high - low)))
-
-def _population_generator_efficiency(context):
-    seconds = context.generation_time_seconds
-    if seconds is None or seconds <= 0:
+def _population_repair_rate(context: PopulationMetricContext) -> float | None:
+    repaired = [_repair_needed(item) for item in context.evaluated_contexts]
+    if not repaired or any(value is None for value in repaired):
         return None
-    return len(context.population_contexts) / seconds
+    return sum(repaired) / len(repaired)
+
+
+def _population_generator_reliability(context: PopulationMetricContext) -> float | None:
+    scores = []
+    for item in context.evaluated_contexts:
+        valid = item.record.get("valid")
+        if valid is False:
+            scores.append(0.0)
+        elif valid is True:
+            repaired = _repair_needed(item)
+            if repaired is None:
+                return None
+            scores.append(0.5 if repaired else 1.0)
+        else:
+            return None
+    return mean(scores) if scores else None
+
+
+def _population_generation_time(context: PopulationMetricContext) -> float | None:
+    if not context.whole_run or not context.population_contexts:
+        return None
+    seconds = context.experiment.get("run_metadata", {}).get("generation_time_seconds")
+    if not _is_number(seconds) or seconds < 0:
+        return None
+    return float(seconds) / len(context.population_contexts)
+
+
+def _population_generation_cost(context: PopulationMetricContext) -> float | None:
+    if not context.whole_run or not context.population_contexts:
+        return None
+    generator = context.experiment.get("generator")
+    settings = context.experiment.get("generator_settings", {})
+    if generator in available_generators() and generator_family(generator) != "llm_based":
+        return 0.0  # API charges only; local hardware/electricity are not estimated.
+    if generator == "template_hybrid" and settings.get("template_pool_path") is not None:
+        return 0.0  # This run reuses templates without making provider requests.
+    sources = {
+        "llm_map_creator": ("llm_map_generation.json", "maps"),
+        "template_hybrid": ("template_generation.json", "requests"),
+    }
+    if generator not in sources or context.run_dir is None:
+        return None
+    filename, request_key = sources[generator]
+    try:
+        summary = json.loads((context.run_dir / filename).read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(summary, dict) or not isinstance(summary.get(request_key), list):
+        return None
+    # Read one run summary only: map metadata and attempt files repeat these costs.
+    # Include unsuccessful attempts; their requests also consumed API resources.
+    total_ticks, attempt_count = 0, 0
+    for request in summary[request_key]:
+        if not isinstance(request, dict) or not isinstance(request.get("attempts"), list):
+            return None
+        for attempt in request["attempts"]:
+            usage = attempt.get("usage") if isinstance(attempt, dict) else None
+            ticks = usage.get("cost_in_usd_ticks") if isinstance(usage, dict) else None
+            if type(ticks) is not int or ticks < 0:
+                return None
+            total_ticks += ticks
+            attempt_count += 1
+    # xAI reports 10^10 ticks per USD, including caching discounts.
+    return total_ticks / 10_000_000_000 / len(context.population_contexts) if attempt_count else None
+
+
+def _population_generator_efficiency(context: PopulationMetricContext) -> float | None:
+    seconds_per_output = _population_generation_time(context)
+    if seconds_per_output is None or seconds_per_output <= 0:
+        return None
+    return 1.0 / seconds_per_output
 
 def _population_generated_map_count(context: PopulationMetricContext) -> int:
     return _population_counts(context)[0]
@@ -996,6 +1113,17 @@ def _read_decimal_comma_rows(path: Path, expected_values: int) -> list[tuple[flo
     try:
         lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
     except OSError:
+        return rows
+    # New spatial logs have a named ID column and invariant-culture numbers.
+    # Older headerless logs retain the decimal-comma handling below.
+    if lines and next(csv.reader([lines[0]]), [])[-1:] == ["bot_match_id"]:
+        for parts in csv.reader(lines[1:]):
+            if len(parts) != expected_values + 1:
+                continue
+            try:
+                rows.append(tuple(float(part) for part in parts[:-1]))
+            except ValueError:
+                continue
         return rows
     for line in lines:
         text = line.strip()
@@ -1052,6 +1180,7 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
     "closeness_centrality": _closeness_centrality,
     "betweenness_centrality": _betweenness_centrality,
     "chokepoint_count": _chokepoint_count,
+    "chokepoint_ratio": _chokepoint_ratio,
     "loop_count": _loop_count,
     "alternative_path_count": _alternative_path_count,
     "average_visibility": _average_visibility,
@@ -1095,6 +1224,7 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
     "kill_streak_max_bot_2": lambda context: _maximum_unity(context, "killStreakMax2"),
     "entropy": _direct_unity("entropy"),
     "pace": _direct_unity("pace"),
+    "zero_kill_match_frequency": _zero_kill_match_frequency,
     "fight_time": _direct_unity("fightTime"),
     "pursue_time": _direct_unity("pursueTime"),
     "sight_loss_rate": _direct_unity("sightLossRate"),
@@ -1134,9 +1264,14 @@ _METRIC_FUNCTIONS: dict[str, MetricFunction] = {
 
 _POPULATION_METRIC_FUNCTIONS: dict[str, Callable[[PopulationMetricContext], MetricValue]] = {
     "map_diversity": _population_map_diversity,
+    "unique_map_ratio": _population_unique_map_ratio,
     "expressive_range": _population_expressive_range,
     "generator_success_rate": _population_generator_success_rate,
+    "generator_reliability": _population_generator_reliability,
     "generator_efficiency": _population_generator_efficiency,
+    "repair_rate": _population_repair_rate,
+    "generation_time_per_output_map": _population_generation_time,
+    "generation_cost_per_output_map": _population_generation_cost,
     "generated_map_count": _population_generated_map_count,
     "valid_map_count": _population_valid_map_count,
     "invalid_map_count": _population_invalid_map_count,

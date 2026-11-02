@@ -297,16 +297,18 @@ class ExperimentSession:
         The behavior is controlled by
         ``generator_settings.copy_final_candidate_maps``. Missing Unity inputs are
         reported and skipped, which allows dry runs and invalid maps to complete.
+        Each selected population member gets its own numbered copy, including
+        repeated map IDs.
         """
         if bool(self.generator_settings.get("copy_final_candidate_maps", False)) is False:
             return []
 
-        selected = sorted({str(value) for value in map_ids})
+        selected = [str(value) for value in map_ids]
         export_dir = self.output_dir / "export"
         export_dir.mkdir(parents=True, exist_ok=True)
 
         copied: list[Path] = []
-        for map_id in selected:
+        for index, map_id in enumerate(selected, start=1):
             matches = sorted(
                 self.output_dir.glob(f"epoch_*/{map_id}.unity.json")
             )
@@ -318,7 +320,7 @@ class ExperimentSession:
                 continue
 
             source = matches[-1]
-            destination = export_dir / source.name
+            destination = export_dir / f"{index:02d}_{source.name}"
             shutil.copy2(source, destination)
             copied.append(destination)
 

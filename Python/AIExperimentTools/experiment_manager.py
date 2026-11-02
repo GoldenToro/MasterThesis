@@ -11,13 +11,15 @@ import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from analysis.experiment_analyzer import ExperimentAnalyzer
+from analysis.experiment_postprocessor import ExperimentPostprocessor
 from experiment_session import ExperimentSession
+from simulation.unity_runner import get_bot_matches
 
 
 LOGGER = logging.getLogger("FPS-EVALUATOR")
@@ -105,14 +107,16 @@ class ExperimentManager:
             experiment=experiment,
         )
         try:
+            production_started = monotonic()
             final_map_ids = base_generator.start()
+            metadata["generation_time_seconds"] = monotonic() - production_started
             metadata["final_candidate_map_ids"] = list(final_map_ids)
             self._write_evaluated_experiment(run_dir, experiment, metadata)
             copied_final_candidate_maps = base_generator.copy_final_candidate_maps(
                 final_map_ids
             )
-            analysis_summary = ExperimentAnalyzer(
-                run_dir, experiment
+            analysis_summary = ExperimentPostprocessor(
+                run_dir, {**experiment, "run_metadata": metadata}
             ).run(final_map_ids)
             base_generator.cleanup_outputs()
 
@@ -346,8 +350,6 @@ class ExperimentManager:
                 "simulations_per_map",
                 "matches_per_simulation",
                 "game_length",
-                "bot1",
-                "bot2",
             }
             missing_simulator = sorted(simulator_required - simulator.keys())
             if missing_simulator:
@@ -357,17 +359,16 @@ class ExperimentManager:
                 )
             if int(simulator["simulations_per_map"]) <= 0:
                 raise ValueError("simulations_per_map must be positive")
-            if int(simulator["matches_per_simulation"]) != 2:
+            matches_per_simulation = int(simulator["matches_per_simulation"])
+            if matches_per_simulation <= 0 or matches_per_simulation % 2:
                 raise ValueError(
-                    "matches_per_simulation must be 2: "
-                    "one match for each initial spawn assignment"
+                    "matches_per_simulation must be a positive even number: "
+                    "equal matches for each initial spawn assignment"
                 )
             if int(simulator["game_length"]) <= 0:
                 raise ValueError("game_length must be positive")
 
-            for bot_name in ("bot1", "bot2"):
-                if {"file", "skill"}.issubset(simulator[bot_name]) is False:
-                    raise ValueError(f"{bot_name} requires file and skill")
+            get_bot_matches(simulator)
 
         analysis = experiment.get("analysis_settings", {})
         if bool(analysis.get("enabled", False)):
@@ -513,6 +514,12 @@ def main() -> int:
 
     for output in outputs:
         LOGGER.info("Experiment completed: %s", output)
+    if outputs:
+        from experiment_analyzer import main as analyze_experiments
+
+        batch_dir = outputs[0].parent
+        LOGGER.info("Analyzing experiment batch: %s", batch_dir)
+        analyze_experiments([str(batch_dir)])
     return 0
 
 

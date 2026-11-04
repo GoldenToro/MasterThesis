@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using AI;
 using Newtonsoft.Json;
 
@@ -17,8 +18,17 @@ namespace Tester
         [JsonProperty("paths")] public MapTestPaths paths = new MapTestPaths();
         [JsonProperty("logging")] public MapTestLogging logging = new MapTestLogging();
         [JsonProperty("map")] public CanonicalGridConfiguration map = new CanonicalGridConfiguration();
+        [JsonProperty("bot_matches")] public Dictionary<string, MapTestBotMatch> botMatches;
+        // Legacy single-pair map files remain readable.
         [JsonProperty("bot1")] public MapTestBotConfiguration bot1 = MapTestBotConfiguration.CreateDefault(1);
         [JsonProperty("bot2")] public MapTestBotConfiguration bot2 = MapTestBotConfiguration.CreateDefault(2);
+    }
+
+    [Serializable]
+    public class MapTestBotMatch
+    {
+        [JsonProperty("bot1")] public MapTestBotConfiguration bot1;
+        [JsonProperty("bot2")] public MapTestBotConfiguration bot2;
     }
 
     [Serializable]

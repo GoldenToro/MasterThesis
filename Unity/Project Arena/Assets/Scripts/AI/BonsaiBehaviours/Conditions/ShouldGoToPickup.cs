@@ -6,7 +6,7 @@ using UnityEngine;
 namespace AI.BonsaiBehaviours.Conditions
 {
     /// <summary>
-    /// Returns Success if we should go to the pickup, Running otherwise
+    /// Runs the camping branch while waiting, then succeeds when the pickup is expected to be available.
     /// </summary>
     [BonsaiNode("Conditional/")]
     public class ShouldGoToPickup : TimedEvaluationConditionalAbort
@@ -20,12 +20,16 @@ namespace AI.BonsaiBehaviours.Conditions
 
         public override bool Condition()
         {
-            return Time.time >= pickupPlanner.GetChosenPickupEstimatedActivationTime();
+            return Time.time < pickupPlanner.GetChosenPickupEstimatedActivationTime();
         }
 
         public override Status Run()
         {
-            return Condition() ? Status.Success : Status.Running;
+            if (!Condition()) return Status.Success;
+
+            // Keep moving nearby if the previous camping path finished before the pickup respawned.
+            Iterator.Traverse(Child);
+            return Status.Running;
         }
     }
 }

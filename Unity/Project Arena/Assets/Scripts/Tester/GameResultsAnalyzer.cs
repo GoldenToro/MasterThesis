@@ -43,6 +43,10 @@ namespace Tester
 
         private readonly Dictionary<int, float> timeToSurrender = new();
 
+        private readonly Dictionary<int, PickupLogEntry[]> pickupEvents = new();
+        private readonly Dictionary<int, AliveInterval[]> aliveIntervals = new();
+        private readonly Dictionary<int, float> aliveTime = new();
+
         public GameResultsAnalyzer(int bot1ID, int bot2ID)
         {
             this.bot1ID = bot1ID;
@@ -84,6 +88,9 @@ namespace Tester
             killStreaksSum.Clear();
             currentKillStreak.Clear();
             nonZeroKillStreaksCount.Clear();
+            pickupEvents.Clear();
+            aliveIntervals.Clear();
+            aliveTime.Clear();
         }
 
         private void LogMetrics(GameMetrics receivedInfo)
@@ -95,6 +102,9 @@ namespace Tester
             timeToSurrender.Add(receivedInfo.entityId, receivedInfo.timeToSurrender);
             timeBetweenSights.Add(receivedInfo.entityId, receivedInfo.timeBetweenSights);
             numberOfSights.Add(receivedInfo.entityId, receivedInfo.numberOfSights);
+            pickupEvents[receivedInfo.entityId] = receivedInfo.pickupEvents;
+            aliveIntervals[receivedInfo.entityId] = receivedInfo.aliveIntervals;
+            aliveTime[receivedInfo.entityId] = receivedInfo.aliveTime;
         }
 
         private void LogHit(HitInfo receivedInfo)
@@ -247,7 +257,15 @@ namespace Tester
                 {"fightTime", fightTime},
                 {"pursueTime", pursueTime},
                 {"sightLossRate", sightLossRate},
-                {"targetLossRate", targetLossRate}
+                {"targetLossRate", targetLossRate},
+                {"resourceLogVersion", 1},
+                {"resourceLogTimeBasis", "scaled seconds since active match start"},
+                {"pickupEvents1", pickupEvents.GetOrDefault(bot1ID)},
+                {"pickupEvents2", pickupEvents.GetOrDefault(bot2ID)},
+                {"aliveIntervals1", aliveIntervals.GetOrDefault(bot1ID)},
+                {"aliveIntervals2", aliveIntervals.GetOrDefault(bot2ID)},
+                {"aliveTime1", aliveTime.TryGetValue(bot1ID, out var alive1) ? (float?) alive1 : null},
+                {"aliveTime2", aliveTime.TryGetValue(bot2ID, out var alive2) ? (float?) alive2 : null}
             };
             foreach (var key in compiled.Keys.ToArray())
             {

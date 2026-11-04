@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Logging;
+using Pickables;
 using UnityEngine;
 
 namespace AI.Layers.Statistics
@@ -12,6 +14,13 @@ namespace AI.Layers.Statistics
     public class LoggingComponent
     {
         private readonly AIEntity entity;
+
+        private readonly List<PickupLogEntry> pickupEvents = new();
+        private readonly List<AliveInterval> aliveIntervals = new();
+        private float? activeMatchStart;
+        private float? aliveIntervalStart;
+        private float totalAliveTime;
+        private bool resourceLoggingEnded;
 
         private bool loggedFirstRespawn;
 
@@ -45,10 +54,56 @@ namespace AI.Layers.Statistics
         public LoggingComponent(AIEntity entity)
         {
             this.entity = entity;
+            lastRespawnTime = Time.time;
             SpawnInfoGameEvent.Instance.AddListener(RespawnEvent);
             FocusingOnEnemyGameEvent.Instance.AddListener(FocusingEvent);
         }
 
+
+        public void LogActiveState(bool active)
+        {
+            if (resourceLoggingEnded) return;
+            if (active)
+            {
+                if (!activeMatchStart.HasValue) activeMatchStart = Time.time;
+                if (!aliveIntervalStart.HasValue)
+                    aliveIntervalStart = Time.time - activeMatchStart.Value;
+            }
+            else if (aliveIntervalStart.HasValue)
+            {
+                var end = Mathf.Max(aliveIntervalStart.Value, Time.time - activeMatchStart.Value);
+                aliveIntervals.Add(new AliveInterval
+                {
+                    startSeconds = aliveIntervalStart.Value,
+                    endSeconds = end
+                });
+                totalAliveTime += end - aliveIntervalStart.Value;
+                aliveIntervalStart = null;
+            }
+        }
+
+        public void LogPickup(Pickable pickup, int healthBefore)
+        {
+            if (resourceLoggingEnded || !aliveIntervalStart.HasValue) return;
+            var position = pickup.transform.position;
+            var healthAfter = entity.Health;
+            pickupEvents.Add(new PickupLogEntry
+            {
+                timeSeconds = Time.time - activeMatchStart.Value,
+                entityId = entity.GetID(),
+                pickupId = pickup.GetInstanceID(),
+                pickupType = pickup.GetPickupType().ToString(),
+                x = position.x,
+                z = position.z,
+                healthBefore = healthBefore,
+                healthAfter = healthAfter,
+                maxHealth = entity.MaxHealth,
+                // Exclude overfill and recovery of negative, overkill health.
+                healthRestored = Mathf.Max(0,
+                    Mathf.Clamp(healthAfter, 0, entity.MaxHealth) -
+                    Mathf.Clamp(healthBefore, 0, entity.MaxHealth))
+            });
+        }
 
         // TODO Combat event might start even if enemy is not visible
         // TODO I might give up search before even detecting the enemy in the first place, so the total time to
@@ -106,6 +161,8 @@ namespace AI.Layers.Statistics
 
         public void PublishAndRelease()
         {
+            LogActiveState(false);
+            resourceLoggingEnded = true;
             // TODO update last time with focusing on enemy false
             EntityGameMetricsGameEvent.Instance.Raise(
                 new GameMetrics
@@ -117,7 +174,10 @@ namespace AI.Layers.Statistics
                     timeToEngage = totalTimeToEngage,
                     numberOfRetreats = numberOfRetreats,
                     numberOfFights = numberOfFights,
-                    numberOfSights = numberOfSights
+                    numberOfSights = numberOfSights,
+                    pickupEvents = pickupEvents.ToArray(),
+                    aliveIntervals = aliveIntervals.ToArray(),
+                    aliveTime = totalAliveTime
                 }
             );
 

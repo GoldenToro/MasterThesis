@@ -520,7 +520,7 @@ MonoBehaviour:
   comment: 
   bonsaiNodePosition: {x: 868.5, y: 526.5}
   child: {fileID: 2521230517873367015}
-  abortType: 0
+  abortType: 2
 --- !u!114 &7065564209441800618
 MonoBehaviour:
   m_ObjectHideFlags: 1

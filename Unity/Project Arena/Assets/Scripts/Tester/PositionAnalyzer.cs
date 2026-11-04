@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Logging;
 using UnityEngine;
@@ -14,14 +15,15 @@ namespace Tester
         private readonly int bot1ID;
         private readonly int bot2ID;
 
-        private readonly Dictionary<int, List<Vector2>> positions = new Dictionary<int, List<Vector2>>();
+        public string BotMatchId { get; set; } = "1";
+        private readonly Dictionary<int, List<(Vector2 position, string botMatchId)>> positions = new();
         
         public PositionAnalyzer(int bot1ID, int bot2ID)
         {
             this.bot1ID = bot1ID;
             this.bot2ID = bot2ID;
-            positions[bot1ID] = new List<Vector2>();
-            positions[bot2ID] = new List<Vector2>();
+            positions[bot1ID] = new();
+            positions[bot2ID] = new();
         }
 
         public void Setup()
@@ -31,7 +33,7 @@ namespace Tester
 
         private void LogPosition(PositionInfo obj)
         {
-            positions[obj.entityID].Add(new Vector2(obj.x, obj.z));
+            positions[obj.entityID].Add((new Vector2(obj.x, obj.z), BotMatchId));
         }
 
         public void TearDown()
@@ -53,15 +55,16 @@ namespace Tester
             return new Tuple<string, string>(GetCSV(positions1), GetCSV(positions2));
         }
 
-        private string GetCSV(List<Vector2> positions)
+        private string GetCSV(List<(Vector2 position, string botMatchId)> positions)
         {
             var csvBuilder = new StringBuilder();
-            foreach (var position in positions)
+            csvBuilder.AppendLine("x,z,bot_match_id");
+            foreach (var sample in positions)
             {
-                csvBuilder.Append(position.x);
+                csvBuilder.Append(sample.position.x.ToString(CultureInfo.InvariantCulture));
                 csvBuilder.Append(',');
-                csvBuilder.Append(position.y);
-                csvBuilder.AppendLine();
+                csvBuilder.Append(sample.position.y.ToString(CultureInfo.InvariantCulture));
+                csvBuilder.Append(",\"").Append(sample.botMatchId.Replace("\"", "\"\"")).AppendLine("\"");
             }
 
             return csvBuilder.ToString();

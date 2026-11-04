@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Logging;
 using UnityEngine;
@@ -13,14 +14,15 @@ namespace Tester
     {
         private readonly int bot1ID;
         private readonly int bot2ID;
-        private readonly Dictionary<int, List<Vector4>> deathAndKillPositions = new();
+        public string BotMatchId { get; set; } = "1";
+        private readonly Dictionary<int, List<(Vector4 position, string botMatchId)>> deathAndKillPositions = new();
         
         public DeathPositionAnalyzer(int bot1ID, int bot2ID)
         {
             this.bot1ID = bot1ID;
             this.bot2ID = bot2ID;
-            deathAndKillPositions.Add(bot1ID, new List<Vector4>());
-            deathAndKillPositions.Add(bot2ID, new List<Vector4>());
+            deathAndKillPositions.Add(bot1ID, new());
+            deathAndKillPositions.Add(bot2ID, new());
         }
 
         public void Setup()
@@ -36,8 +38,8 @@ namespace Tester
         public void Reset()
         {    
             deathAndKillPositions.Clear();
-            deathAndKillPositions.Add(bot1ID, new List<Vector4>());
-            deathAndKillPositions.Add(bot2ID, new List<Vector4>());
+            deathAndKillPositions.Add(bot1ID, new());
+            deathAndKillPositions.Add(bot2ID, new());
         }
 
         private void LogDeathPosition(KillInfo receivedInfo)
@@ -49,7 +51,7 @@ namespace Tester
             }
 
             deathAndKillPositions[receivedInfo.killedEntityID].Add(
-                new Vector4(receivedInfo.killedX, receivedInfo.killedZ, receivedInfo.killerX, receivedInfo.killerZ)
+                (new Vector4(receivedInfo.killedX, receivedInfo.killedZ, receivedInfo.killerX, receivedInfo.killerZ), BotMatchId)
                 );
         }
 
@@ -61,19 +63,20 @@ namespace Tester
             return new Tuple<string, string>(GetCSV(positions1), GetCSV(positions2));
         }
 
-        private string GetCSV(List<Vector4> positions)
+        private string GetCSV(List<(Vector4 position, string botMatchId)> positions)
         {
             var csvBuilder = new StringBuilder();
-            foreach (var position in positions)
+            csvBuilder.AppendLine("death_x,death_z,killer_x,killer_z,bot_match_id");
+            foreach (var sample in positions)
             {
-                csvBuilder.Append(position.x);
+                csvBuilder.Append(sample.position.x.ToString(CultureInfo.InvariantCulture));
                 csvBuilder.Append(',');
-                csvBuilder.Append(position.y);
+                csvBuilder.Append(sample.position.y.ToString(CultureInfo.InvariantCulture));
                 csvBuilder.Append(',');
-                csvBuilder.Append(position.z);
+                csvBuilder.Append(sample.position.z.ToString(CultureInfo.InvariantCulture));
                 csvBuilder.Append(',');
-                csvBuilder.Append(position.w);
-                csvBuilder.AppendLine();
+                csvBuilder.Append(sample.position.w.ToString(CultureInfo.InvariantCulture));
+                csvBuilder.Append(",\"").Append(sample.botMatchId.Replace("\"", "\"\"")).AppendLine("\"");
             }
 
             return csvBuilder.ToString();

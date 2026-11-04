@@ -18,6 +18,7 @@ namespace AI.BonsaiBehaviours.Conditions
         private const float TIMEOUT_CHANGE_IDEA = 1.5f; 
         private float timestampChangeIdeaAllowed; 
         private float probabilityFightBack;
+        private bool hasDecidedToFight;
 
         public override void OnStart()
         {
@@ -26,38 +27,26 @@ namespace AI.BonsaiBehaviours.Conditions
             probabilityFightBack = entity.Characteristics.FightBackWhenCollectingPickup;
         }
 
-        public override void OnEnter()
-        {
-        }
-
         public override bool Condition()
         {
-            if (Time.time < timestampChangeIdeaAllowed)
+            if (!_targetKnowledgeBase.HasDetectedTarget())
             {
-                // I won't change my decision for now.
+                hasDecidedToFight = false;
+                FocusingOnEnemyGameEvent.Instance.Raise(new FocusOnEnemyInfo {entityID = entity.GetID(), isFocusing = false});
                 return false;
             }
 
-            if (_targetKnowledgeBase.HasDetectedTarget())
+            if (Time.time < timestampChangeIdeaAllowed)
             {
-                timestampChangeIdeaAllowed = Time.time + TIMEOUT_CHANGE_IDEA;
-                if (Random.value > probabilityFightBack)
-                {
-                    // Not feeling enough confident to fight back.
-                    FocusingOnEnemyGameEvent.Instance.Raise(new FocusOnEnemyInfo {entityID = entity.GetID(), isFocusing = false});
-                    return false;
-                }
-                
-                FocusingOnEnemyGameEvent.Instance.Raise(new FocusOnEnemyInfo {entityID = entity.GetID(), isFocusing = true});
-                return true;
+                // I won't change my decision for now.
+                return hasDecidedToFight;
             }
-            FocusingOnEnemyGameEvent.Instance.Raise(new FocusOnEnemyInfo {entityID = entity.GetID(), isFocusing = false});
-            return false;
-        }
 
-        public override Status Run()
-        {
-            return Condition() ? Status.Success : Status.Failure;
+            timestampChangeIdeaAllowed = Time.time + TIMEOUT_CHANGE_IDEA;
+            hasDecidedToFight = Random.value <= probabilityFightBack;
+            FocusingOnEnemyGameEvent.Instance.Raise(new FocusOnEnemyInfo
+                {entityID = entity.GetID(), isFocusing = hasDecidedToFight});
+            return hasDecidedToFight;
         }
     }
 }

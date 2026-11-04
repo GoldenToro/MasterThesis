@@ -260,6 +260,7 @@ namespace AI
 
         public override void HealFromMedkit(MedkitPickable medkit)
         {
+            var healthBefore = health;
             if (health + medkit.RestoredHealth > totalHealth)
                 health = totalHealth;
             else
@@ -277,6 +278,7 @@ namespace AI
 
             
             PickupMemory.MarkConsumed(medkit);
+            if (loggingGame) loggingComponent.LogPickup(medkit, healthBefore);
         }
 
         public override bool CanBeSupplied(bool[] suppliedGuns)
@@ -288,6 +290,7 @@ namespace AI
         {
             GunManager.SupplyGuns(ammoCrate.SuppliedGuns, ammoCrate.AmmoAmounts);
             PickupMemory.MarkConsumed(ammoCrate);
+            if (loggingGame) loggingComponent.LogPickup(ammoCrate, health);
         }
 
         public override void SetInGame(bool b, bool isGameEnded = false)
@@ -297,6 +300,7 @@ namespace AI
             GetComponent<CapsuleCollider>().enabled = b;
             MeshVisibility.SetMeshVisible(transform, b);
             inGame = b;
+            if (loggingGame) loggingComponent.LogActiveState(b);
 
             if (isGameEnded && loggingGame)
             {

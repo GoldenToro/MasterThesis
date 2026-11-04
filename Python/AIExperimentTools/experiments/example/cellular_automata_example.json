@@ -29,7 +29,10 @@
     "connect_regions": true,
     "corridor_width": 1,
     "map_completion": {
-      "mode": "generator"
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
     }
   },
   "simulator_settings": {
@@ -41,13 +44,17 @@
     "log_kill_distances": true,
     "save_unity_map": false,
     "game_length": 120,
-    "bot1": {
-      "file": "assault",
-      "skill": 0.4
-    },
-    "bot2": {
-      "file": "sniper",
-      "skill": 0.6
+    "bot_matches": {
+      "1": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.4
+        },
+        "bot2": {
+          "file": "sniper",
+          "skill": 0.6
+        }
+      }
     }
   },
   "analysis_settings": {

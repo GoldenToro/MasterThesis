@@ -6,15 +6,14 @@
     "map_count": 2,
     "map_width": 64,
     "map_height": 42,
-    "rules_text": "Create a balanced 2v2 science-fiction arena. Use two distant spawn areas, a contested center, two or three clear routes, a health pickup near the center, and ammo on a side route. Keep dead ends rare.",
+    "rules_text": "Create a balanced science-fiction arena layout with two distant spawn areas, a contested center, two or three clear routes, and few dead ends. Return exactly 42 rows, each containing exactly 64 characters. Use only # for walls and . for floors. Enclose the map with walls and connect all floor cells through horizontal or vertical adjacency. Return only the grid as plain text, without spaces, code fences or explanations. Examples illustrate layout ideas; the output must use the dimensions specified here.",
     "max_attempts_per_map": 2,
     "max_prompt_examples": 1,
     "example_map_paths": [
-      "generators/llm_based/llm_map_creator/example_generated_maps.json"
+      "configs/examples/maps/1.json"
     ],
     "grok": {
       "model": "grok-4.5",
-      "api_key_env": "XAI_API_KEY",
       "base_url": "https://api.x.ai/v1",
       "timeout_seconds": 240,
       "max_output_tokens": 12000,
@@ -50,6 +49,13 @@
           "maximum": 20.0
         }
       ]
+    },
+    "repair_max_changed_cells": 8,
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 3,
+      "ammo_count": 3
     }
   },
   "simulator_settings": {

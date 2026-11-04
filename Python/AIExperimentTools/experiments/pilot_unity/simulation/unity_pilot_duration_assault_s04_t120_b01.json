@@ -1,0 +1,84 @@
+{
+  "experiment_name": "unity_pilot_duration_assault_s04_t120_b01",
+  "generator": "manual",
+  "generator_settings": {
+    "seed": 3102,
+    "num_epochs": 0,
+    "max_time_seconds": 27682,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "maps_directory": "E:\\Thesis-Projekt\\ProjectArena-thesis\\Python\\AIExperimentTools\\pilot\\unity_pilot\\maps\\compact_all",
+    "map_completion": {
+      "mode": "generator"
+    },
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    }
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 10,
+    "matches_per_simulation": 2,
+    "game_length": 120,
+    "ready_duration": 1,
+    "score_duration": 0,
+    "respawn_duration": 3,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "log_positions": false,
+    "log_death_positions": false,
+    "log_kill_distances": false,
+    "save_unity_map": true
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "entropy",
+      "pace",
+      "walkable_area_ratio",
+      "max_symmetry"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  },
+  "unity_pilot": {
+    "condition_id": "duration_assault_s04_t120",
+    "stage": "duration",
+    "game_length": 120,
+    "skill": 0.4,
+    "bot": "assault",
+    "block": 1,
+    "pairs": 10,
+    "note": "Frozen maps; Python seed does not seed Unity randomness."
+  }
+}

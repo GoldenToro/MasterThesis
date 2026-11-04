@@ -1,0 +1,106 @@
+{
+  "experiment_name": "pilot_llm_map_creator_loop_flank_s303",
+  "generator": "llm_map_creator",
+  "pilot": {
+    "variant": "loop_flank",
+    "stage": "pilot",
+    "comparable": true,
+    "comparison_group": "generated_64x64"
+  },
+  "generator_settings": {
+    "seed": 303,
+    "num_epochs": 0,
+    "max_time_seconds": 600,
+    "final_map_count": 4,
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "map_count": 3,
+    "max_attempts_per_map": 2,
+    "max_prompt_examples": 0,
+    "example_map_paths": [],
+    "rules_text": "Create a connected competitive FPS layout organized around a loop with several cross-connections and flank routes. Use varied room sizes and interior walls to interrupt long sightlines. Avoid long dead ends and one-cell bottlenecks. Corridors should be at least two cells wide. Return only wall/floor geometry; the framework places spawns and items.",
+    "grok": {
+      "model": "grok-4.5",
+      "base_url": "https://api.x.ai/v1",
+      "timeout_seconds": 240,
+      "max_output_tokens": 12000,
+      "reasoning_effort": "low",
+      "store": false,
+      "llm_budget_path": "E:\\Thesis-Projekt\\ProjectArena-thesis\\Python\\AIExperimentTools\\pilot\\llm_budget.json",
+      "llm_budget_usd": 5.5,
+      "llm_max_requests": 36
+    }
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 1,
+    "matches_per_simulation": 2,
+    "game_length": 60,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "log_positions": false,
+    "log_death_positions": false,
+    "log_kill_distances": false,
+    "save_unity_map": true
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "entropy",
+      "pace",
+      "walkable_area_ratio",
+      "max_symmetry",
+      "connectivity",
+      "map_diversity",
+      "generator_success_rate",
+      "generated_map_count",
+      "valid_map_count",
+      "invalid_map_count",
+      "repair_count",
+      "constraint_violation_count"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  }
+}

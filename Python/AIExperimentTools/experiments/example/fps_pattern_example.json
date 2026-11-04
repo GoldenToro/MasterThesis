@@ -41,13 +41,17 @@
     "log_kill_distances": true,
     "save_unity_map": false,
     "game_length": 120,
-    "bot1": {
-      "file": "assault",
-      "skill": 0.4
-    },
-    "bot2": {
-      "file": "sniper",
-      "skill": 0.6
+    "bot_matches": {
+      "1": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.4
+        },
+        "bot2": {
+          "file": "sniper",
+          "skill": 0.6
+        }
+      }
     }
   },
   "analysis_settings": {

@@ -1,0 +1,68 @@
+{
+  "experiment_name": "unity_pilot_generated_grid_graph_some_loops_32_s2101",
+  "generator": "grid_graph",
+  "generator_settings": {
+    "seed": 2101,
+    "num_epochs": 0,
+    "max_time_seconds": 0,
+    "final_map_count": 1,
+    "map_width": 32,
+    "map_height": 32,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": false,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "walkable_area_ratio",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "population_size": 1,
+    "graph_rows": 4,
+    "graph_columns": 5,
+    "room_fill_ratio": 0.75,
+    "room_padding": 1,
+    "corridor_width": 2,
+    "loop_probability": 0.25
+  },
+  "simulator_settings": {
+    "enabled": false
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "walkable_area_ratio",
+      "connectivity",
+      "max_symmetry"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  },
+  "unity_pilot": {
+    "stage": "frozen_generation",
+    "variant": "grid_graph_some_loops",
+    "source_config": "experiments\\real_run_proposed\\grid_graph_some_loops_s1001.json",
+    "parameter_policy": "All method parameters are copied unchanged from the proposed 64x64 finalist. Only dimensions, independent seed, population/final count, evaluation and logging settings change. Absolute room/corridor dimensions stay in cells at scale 2; relative probabilities remain fixed. Geometry already derived from map dimensions scales within the original generator. Realized room count and coverage can therefore differ with size; no fitness-based retuning.",
+    "attempts": 1,
+    "replacement_requests": false
+  }
+}

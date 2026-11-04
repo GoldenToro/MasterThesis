@@ -1,0 +1,95 @@
+{
+  "experiment_name": "pilot_nsga2_mutation_low_s101",
+  "generator": "nsga2",
+  "pilot": {
+    "variant": "mutation_low",
+    "stage": "pilot",
+    "comparable": true,
+    "comparison_group": "generated_64x64"
+  },
+  "generator_settings": {
+    "seed": 101,
+    "num_epochs": 1,
+    "max_time_seconds": 600,
+    "final_map_count": 4,
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "population_size": 8,
+    "mate_probability": 0.3,
+    "gene_mutation_probability": 0.2,
+    "checkpoint_every_epoch": true,
+    "mutate_probability": 0.15
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 1,
+    "matches_per_simulation": 2,
+    "game_length": 60,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "log_positions": false,
+    "log_death_positions": false,
+    "log_kill_distances": false,
+    "save_unity_map": true
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "entropy",
+      "pace",
+      "walkable_area_ratio",
+      "max_symmetry",
+      "connectivity",
+      "map_diversity",
+      "generator_success_rate",
+      "generated_map_count",
+      "valid_map_count",
+      "invalid_map_count",
+      "repair_count",
+      "constraint_violation_count"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  }
+}

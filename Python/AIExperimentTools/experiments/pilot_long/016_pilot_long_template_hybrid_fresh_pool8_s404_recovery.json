@@ -1,0 +1,114 @@
+{
+  "experiment_name": "pilot_long_template_hybrid_fresh_pool8_s404_recovery",
+  "generator": "template_hybrid",
+  "pilot": {
+    "variant": "fresh_pool8",
+    "stage": "long_search",
+    "comparable": true,
+    "comparison_group": "generated_64x64"
+  },
+  "followup": {
+    "method_label": "template_hybrid_fresh",
+    "seed": 404,
+    "kind": "hybrid_new",
+    "template_prompt_variant": "arena_flank_central_block",
+    "template_prompt_note": "Pattern-inspired exploratory comparison; actual family compliance requires inspection. Pool size and preparation also differ from saved_pool3.",
+    "recovery_of": "pilot_long_template_hybrid_fresh_pool8_s404",
+    "attempt_policy": "One attempt per requested layout/template to cover all8templates+6maps within the14remaining request slots; no automatic corrective attempts in this recovery."
+  },
+  "generator_settings": {
+    "seed": 404,
+    "num_epochs": 19,
+    "max_time_seconds": 3600,
+    "final_map_count": 4,
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "template_count": 8,
+    "max_attempts_per_template": 1,
+    "maps_per_epoch": 16,
+    "template_rules_text": "Create one reusable 16 by 16 FPS room template using only # for full-height walls and . for floor. Use the one-based number n shown in the request line \"Map: n of 8\" to select exactly one requested family: n=1,4,7: Arena; n=2,5,8: Flanking Route; n=3,6: Central Block. Keep that family during corrective attempts. State the requested family in metadata.design_summary and include its name in metadata.features.\n\nArena: Make a broad open combat space with one to three small, separated rectangular wall obstacles. Keep the center and approaches spacious, with more than one way around each obstacle. Avoid a maze of narrow corridors.\n\nFlanking Route: Use a short, thick interior dividing wall to create a main approach past one end and a separate side route past its other end. The side route must rejoin beyond the wall, providing another approach to the same area. Keep both ends accessible and leave space for movement; do not divide the room into disconnected halves.\n\nCentral Block: Place one solid rectangular wall block near the center, surrounded by a continuous, broad floor loop. Connect all four doorways to that loop. Use a solid block, not a hollow wall ring enclosing unreachable floor.\n\nFor every family, keep intended passages and gaps at least two cells wide and use only a few simple wall shapes. All floor cells must connect by horizontal or vertical steps. Interior floor cells must remain connected when the outermost row and column on every side are removed; each doorway must open directly into this interior region. Do not add one-cell passages, isolated floor pockets, low cover, elevated areas, spawns or items.\n\nPreserve the exact doorway interface using zero-based coordinates: rows y=0 and y=15 have floor only at x=7 and x=8; columns x=0 and x=15 have floor only at y=7 and y=8. Every other border cell is #. Return exactly 16 rows of exactly 16 characters in the requested canonical JSON schema. Vary the interior within the assigned family without changing this interface.",
+    "grok": {
+      "model": "grok-4.5",
+      "base_url": "https://api.x.ai/v1",
+      "timeout_seconds": 240,
+      "max_output_tokens": 4096,
+      "reasoning_effort": "low",
+      "store": false,
+      "llm_budget_path": "E:\\Thesis-Projekt\\ProjectArena-thesis\\Python\\AIExperimentTools\\pilot\\followup\\llm_budget.json",
+      "llm_budget_usd": 2.5,
+      "llm_max_requests": 28
+    }
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 2,
+    "matches_per_simulation": 2,
+    "game_length": 60,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "log_positions": false,
+    "log_death_positions": false,
+    "log_kill_distances": false,
+    "save_unity_map": true
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "entropy",
+      "pace",
+      "walkable_area_ratio",
+      "max_symmetry",
+      "connectivity",
+      "map_diversity",
+      "generator_success_rate",
+      "generated_map_count",
+      "valid_map_count",
+      "invalid_map_count",
+      "repair_count",
+      "constraint_violation_count"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  }
+}

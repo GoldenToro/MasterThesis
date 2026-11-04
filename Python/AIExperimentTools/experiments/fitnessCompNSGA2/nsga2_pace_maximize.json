@@ -1,0 +1,212 @@
+{
+  "experiment_name": "nsga2_pace_maximize",
+  "no_of_experiments": 1,
+  "generator": "nsga2",
+  "generator_settings": {
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.25,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 3,
+      "ammo_count": 3
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "map_width",
+          "goal": "maximize",
+          "minimum": 0,
+          "maximum": 64,
+          "weight": 0.0
+        }
+      ]
+    },
+    "seed": -1,
+    "num_epochs": 20,
+    "max_time_seconds": 0,
+    "final_map_count": 10,
+    "population_size": 32,
+    "mate_probability": 0.3,
+    "mutate_probability": 0.3,
+    "gene_mutation_probability": 0.2,
+    "checkpoint_every_epoch": true
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 5,
+    "matches_per_simulation": 2,
+    "game_length": 240,
+    "log_positions": true,
+    "log_death_positions": true,
+    "log_kill_distances": true,
+    "save_unity_map": true,
+    "bot_matches": {
+      "1": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.4
+        },
+        "bot2": {
+          "file": "assault",
+          "skill": 0.4
+        }
+      },
+      "2": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.2
+        },
+        "bot2": {
+          "file": "assault",
+          "skill": 0.7
+        }
+      },
+      "3": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.7
+        },
+        "bot2": {
+          "file": "assault",
+          "skill": 0.7
+        }
+      }
+    }
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": true,
+    "calculate_metric": [],
+    "create_diagram_fitness": true,
+    "create_diagram_for_metric": [
+      "map_width",
+      "map_height",
+      "total_tile_count",
+      "walkable_tile_count",
+      "wall_tile_count",
+      "room_count",
+      "corridor_count",
+      "spawn_count",
+      "pickup_count",
+      "walkable_area_ratio",
+      "largest_navigable_region_ratio",
+      "connectivity",
+      "number_of_connected_components",
+      "symmetry_x",
+      "symmetry_y",
+      "max_symmetry",
+      "average_eccentricity",
+      "graph_diameter",
+      "graph_radius",
+      "graph_density",
+      "degree_centrality",
+      "closeness_centrality",
+      "betweenness_centrality",
+      "chokepoint_count",
+      "loop_count",
+      "alternative_path_count",
+      "average_visibility",
+      "maximum_visibility",
+      "visibility_local_maxima_count",
+      "maximum_sightline_length",
+      "spawn_distance_balance",
+      "spawn_exposure",
+      "spawn_escape_routes",
+      "number_of_frags_bot_1",
+      "number_of_frags_bot_2",
+      "number_of_shots_bot_1",
+      "number_of_shots_bot_2",
+      "number_of_hits_bot_1",
+      "number_of_hits_bot_2",
+      "accuracy_bot_1",
+      "accuracy_bot_2",
+      "number_of_fights_bot_1",
+      "number_of_fights_bot_2",
+      "time_in_fight_bot_1",
+      "time_in_fight_bot_2",
+      "time_to_engage_bot_1",
+      "time_to_engage_bot_2",
+      "number_of_sights_bot_1",
+      "number_of_sights_bot_2",
+      "time_between_sights_bot_1",
+      "time_between_sights_bot_2",
+      "number_of_retreats_bot_1",
+      "number_of_retreats_bot_2",
+      "time_to_surrender_bot_1",
+      "time_to_surrender_bot_2",
+      "number_of_suicides_bot_1",
+      "number_of_suicides_bot_2",
+      "kill_streak_average_bot_1",
+      "kill_streak_average_bot_2",
+      "kill_streak_max_bot_1",
+      "kill_streak_max_bot_2",
+      "entropy",
+      "pace",
+      "fight_time",
+      "pursue_time",
+      "sight_loss_rate",
+      "target_loss_rate",
+      "kill_difference",
+      "kill_ratio",
+      "movement_position_count_bot_1",
+      "movement_position_count_bot_2",
+      "movement_heatmap_coverage",
+      "area_dominance",
+      "death_position_count_bot_1",
+      "death_position_count_bot_2",
+      "death_hotspot_concentration",
+      "kill_distance_count",
+      "average_combat_distance",
+      "spawn_death_rate",
+      "map_diversity",
+      "expressive_range",
+      "generator_success_rate",
+      "repair_rate",
+      "controllability_score",
+      "overall_map_quality_score",
+      "generated_map_count",
+      "valid_map_count",
+      "invalid_map_count",
+      "generation_time_per_map",
+      "repair_count",
+      "constraint_violation_count"
+    ],
+    "combat_distance_thresholds": [
+      15.0,
+      35.0
+    ],
+    "spawn_death_radius_tiles": 3.0,
+    "expressive_range_metrics": [
+      "walkable_area_ratio",
+      "max_symmetry"
+    ],
+    "expressive_range_bounds": {
+      "walkable_area_ratio": [
+        0.0,
+        1.0
+      ],
+      "max_symmetry": [
+        0.0,
+        1.0
+      ]
+    }
+  }
+}

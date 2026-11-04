@@ -255,3 +255,5 @@ Python/AIExperimentTools/results_manual_runs/*
 /tmp/pdfs/xu_verbrugge_review/page_5.png
 /tmp/structure_thesis_review/thesis.json
 /tmp/structure_thesis_review/thesis.txt
+/Python/AIExperimentTools/tests/
+/Python/AIExperimentTools/experiments/oldTests/

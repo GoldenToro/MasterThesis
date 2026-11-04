@@ -1,0 +1,101 @@
+{
+  "experiment_name": "pilot_long_template_hybrid_saved_pool3_s404",
+  "generator": "template_hybrid",
+  "pilot": {
+    "variant": "saved_pool3",
+    "stage": "long_search",
+    "comparable": true,
+    "comparison_group": "generated_64x64"
+  },
+  "followup": {
+    "method_label": "template_hybrid_saved",
+    "seed": 404,
+    "kind": "hybrid_saved",
+    "saved_template_pool": "E:\\Thesis-Projekt\\ProjectArena-thesis\\Python\\AIExperimentTools\\results\\2026-10-04_01-01-30\\pilot_template_hybrid_pool4_s101\\_raw\\template_pool.json",
+    "saved_template_count": 3
+  },
+  "generator_settings": {
+    "seed": 404,
+    "num_epochs": 19,
+    "max_time_seconds": 3600,
+    "final_map_count": 4,
+    "map_width": 64,
+    "map_height": 64,
+    "map_scale": 2,
+    "repair_enabled": false,
+    "copy_final_candidate_maps": true,
+    "validation": {
+      "minimum_spawn_count": 2,
+      "minimum_walkable_ratio": 0.08,
+      "maximum_walkable_ratio": 1.0,
+      "require_single_connected_region": true
+    },
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 1,
+      "ammo_count": 1
+    },
+    "fitness": {
+      "metrics": [
+        {
+          "name": "entropy",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        },
+        {
+          "name": "pace",
+          "goal": "maximize",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "template_count": 3,
+    "max_attempts_per_template": 2,
+    "maps_per_epoch": 16,
+    "template_rules_text": "Create a reusable 16 by 16 FPS room with the required two-cell centered doorway on each side. Build a continuous floor route at least two cells wide around the inside perimeter, connecting all four doorways. Use only a few small separated rectangular wall obstacles inside that route; leave gaps at least two cells wide. Do not make one-cell passages or enclosed wall rings that isolate floor. Every floor cell must connect through the interior even if the outside border cells are removed. Keep the exact required border doorway contract."
+  },
+  "simulator_settings": {
+    "enabled": true,
+    "simulations_per_map": 2,
+    "matches_per_simulation": 2,
+    "game_length": 60,
+    "bot1": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "bot2": {
+      "file": "assault",
+      "skill": 0.4
+    },
+    "log_positions": false,
+    "log_death_positions": false,
+    "log_kill_distances": false,
+    "save_unity_map": true
+  },
+  "analysis_settings": {
+    "enabled": true,
+    "only_keep_result_summary": false,
+    "calculate_all_metrics": false,
+    "calculate_metric": [
+      "entropy",
+      "pace",
+      "walkable_area_ratio",
+      "max_symmetry",
+      "connectivity",
+      "map_diversity",
+      "generator_success_rate",
+      "generated_map_count",
+      "valid_map_count",
+      "invalid_map_count",
+      "repair_count",
+      "constraint_violation_count"
+    ],
+    "create_diagram_fitness": false,
+    "create_diagram_for_metric": []
+  }
+}

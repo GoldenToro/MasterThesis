@@ -2,7 +2,6 @@
   "experiment_name": "random_digger",
   "generator": "random_digger",
   "generator_settings": {
-      "only_keep_result_summary": false,
     "population_size": 40,
     "map_width": 64,
     "map_height": 64,
@@ -29,24 +28,35 @@
     "revisit_probability": 0.15,
     "room_chance": 0.03,
     "room_min_size": 3,
-    "room_max_size": 7
+    "room_max_size": 7,
+    "repair_max_changed_cells": 8,
+    "map_completion": {
+      "mode": "generic",
+      "seed": 0,
+      "health_count": 3,
+      "ammo_count": 3
+    }
   },
   "simulator_settings": {
     "enabled": true,
     "simulations_per_map": 1,
-    "matches_per_simulation": 1,
+    "matches_per_simulation": 2,
     "log_positions": true,
     "log_death_positions": true,
     "log_kill_distances": true,
     "save_unity_map": false,
     "game_length": 120,
-    "bot1": {
-      "file": "assault",
-      "skill": 0.4
-    },
-    "bot2": {
-      "file": "sniper",
-      "skill": 0.6
+    "bot_matches": {
+      "1": {
+        "bot1": {
+          "file": "assault",
+          "skill": 0.4
+        },
+        "bot2": {
+          "file": "sniper",
+          "skill": 0.6
+        }
+      }
     }
   },
   "analysis_settings": {
@@ -59,6 +69,7 @@
       "entropy",
       "repair_count",
       "walkable_area_ratio"
-    ]
+    ],
+    "only_keep_result_summary": false
   }
 }
